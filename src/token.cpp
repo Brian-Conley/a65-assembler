@@ -32,3 +32,34 @@ TOKEN_TYPE symbol_to_type(char c) {
             return TOKEN_TYPE::INVALID;
     }
 }
+
+const std::map<TOKEN_TYPE, std::string> type_to_str_lookup = {
+    {TOKEN_TYPE::IDENTIFIER, "IDENTIFIER"},
+    {TOKEN_TYPE::NUMBER_DEC, "NUMBER_DEC"},
+    {TOKEN_TYPE::NUMBER_HEX, "NUMBER_HEX"},
+    {TOKEN_TYPE::NUMBER_BIN, "NUMBER_BIN"},
+
+    {TOKEN_TYPE::HASH, "HASH"},
+    {TOKEN_TYPE::DOLLAR, "DOLLAR"},
+    {TOKEN_TYPE::PERCENT, "PERCENT"},
+
+    {TOKEN_TYPE::LPAREN, "LPAREN"},
+    {TOKEN_TYPE::RPAREN, "RPAREN"},
+
+    {TOKEN_TYPE::PLUS, "PLUS"},
+    {TOKEN_TYPE::MINUS, "MINUS"},
+    {TOKEN_TYPE::STAR, "STAR"},
+    {TOKEN_TYPE::SLASH, "SLASH"},
+    {TOKEN_TYPE::COMMA, "COMMA"},
+
+    {TOKEN_TYPE::DOT, "DOT"},
+    {TOKEN_TYPE::COLON, "COLON"},
+    {TOKEN_TYPE::SEMI, "SEMI"},
+    {TOKEN_TYPE::COMMENT, "COMMENT"},
+
+    {TOKEN_TYPE::INVALID, "INVALID"}
+};
+
+const std::string_view type_to_str(TOKEN_TYPE t) {
+    return type_to_str_lookup.at(t);
+}
