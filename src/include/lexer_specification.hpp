@@ -16,9 +16,15 @@ constexpr std::string_view IDENTIFIER_CONTENT =
     "0123456789"
     "_";
 
-constexpr std::string_view NUMBERS =
+constexpr std::string_view NUMBERS_DEC =
+    "1234567890";
+
+constexpr std::string_view NUMBERS_HEX =
     "1234567890"
-    "ABCDEF";
+    "abcdefABCDEF";
+
+constexpr std::string_view NUMBERS_BIN =
+    "01";
 
 constexpr std::string_view SYMBOLS =
     "#$%()+-*/,.:;";

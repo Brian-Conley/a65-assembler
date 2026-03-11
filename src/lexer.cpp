@@ -55,7 +55,7 @@ Token_T Lexer::parse_identifier() {
 
 Token_T Lexer::parse_number() {
     const size_t start = this->idx;
-    size_t end = this->buffer.find_first_not_of(NUMBERS, start);
+    size_t end = this->buffer.find_first_not_of(NUMBERS_HEX, start);
     if (end == this->buffer.npos) {
         end = this->buffer.size();
     }
@@ -78,7 +78,7 @@ Token_T Lexer::parse_symbol() {
     switch (type) {
         case TOKEN_TYPE::DOLLAR:
             token.type = TOKEN_TYPE::NUMBER_HEX;
-            end = this->buffer.find_first_not_of(NUMBERS, start+1);
+            end = this->buffer.find_first_not_of(NUMBERS_HEX, start+1);
             break;
 
         case TOKEN_TYPE::SEMI:
