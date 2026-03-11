@@ -6,6 +6,7 @@
 enum class TOKEN_TYPE {
     IDENTIFIER,
     NUMBER,
+    NUMBER_HEX,
 
     HASH,       // #
     DOLLAR,     // $

@@ -14,7 +14,6 @@ class Lexer {
         std::vector<Token_T> tokens;
         const std::string buffer;
         size_t idx;
-        bool expecting_number;
 
         Token_T parse_identifier();
         Token_T parse_number();
