@@ -3,3 +3,10 @@ STA $0200
 LDA #$05 ; here is a random comment
 ADC $0200
 STA $0201
+LDA #%01100001 ; here is another comment
+
+STA $Af02 ; final comment
+
+LDA #42
+
+

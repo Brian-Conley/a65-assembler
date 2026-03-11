@@ -24,7 +24,7 @@ const std::vector<Token_T>& Lexer::tokenize() {
         char c = buffer[idx];
         if (IDENTIFIER_START.find_first_of(c) != IDENTIFIER_START.npos) {
             this->tokens.push_back(this->parse_identifier());
-        } else if (NUMBERS.find_first_of(c) != NUMBERS.npos) {
+        } else if (NUMBERS_DEC.find_first_of(c) != NUMBERS_DEC.npos) {
             this->tokens.push_back(this->parse_number());
         } else if (SYMBOLS.find_first_of(c) != SYMBOLS.npos) {
             this->tokens.push_back(this->parse_symbol());
@@ -55,13 +55,13 @@ Token_T Lexer::parse_identifier() {
 
 Token_T Lexer::parse_number() {
     const size_t start = this->idx;
-    size_t end = this->buffer.find_first_not_of(NUMBERS_HEX, start);
+    size_t end = this->buffer.find_first_not_of(NUMBERS_DEC, start);
     if (end == this->buffer.npos) {
         end = this->buffer.size();
     }
 
     Token_T token;
-    token.type = TOKEN_TYPE::NUMBER;
+    token.type = TOKEN_TYPE::NUMBER_DEC;
     token.value = std::string_view(this->buffer.data() + start, end - start);
 
     this->advance(end - start);
@@ -79,6 +79,11 @@ Token_T Lexer::parse_symbol() {
         case TOKEN_TYPE::DOLLAR:
             token.type = TOKEN_TYPE::NUMBER_HEX;
             end = this->buffer.find_first_not_of(NUMBERS_HEX, start+1);
+            break;
+
+        case TOKEN_TYPE::PERCENT:
+            token.type = TOKEN_TYPE::NUMBER_BIN;
+            end = this->buffer.find_first_not_of(NUMBERS_BIN, start+1);
             break;
 
         case TOKEN_TYPE::SEMI:
