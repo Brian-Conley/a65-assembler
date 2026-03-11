@@ -1,0 +1,5 @@
+LDA #$01
+STA $0200
+LDA #$05 ; here is a random comment
+ADC $0200
+STA $0201
