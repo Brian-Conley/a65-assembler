@@ -13,3 +13,8 @@ target_sources(a65 PRIVATE
     ${SRC_DIR}/lexer.cpp
     ${SRC_DIR}/token.cpp
 )
+target_compile_options(a65 PRIVATE
+    -Wall
+    -Wextra
+    -O2
+)
