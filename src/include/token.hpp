@@ -29,7 +29,7 @@ enum class TOKEN_TYPE {
     SEMI,       // ;
     COMMENT,    // derived from SEMI by the Lexer
 
-    INVALID     // used to propagate errors
+    UNKNOWN     // unrecognized token
 };
 
 extern const std::map<TOKEN_TYPE, std::string> type_to_str_lookup;

@@ -4,6 +4,7 @@
 #include "include/token.hpp"
 #include <iostream>
 #include <stdexcept>
+#include <system_error>
 
 Lexer::Lexer(const std::string& path) :
     tokenized(false),
@@ -29,7 +30,8 @@ const std::vector<Token_T>& Lexer::tokenize() {
         } else if (SYMBOLS.find_first_of(c) != SYMBOLS.npos) {
             this->tokens.push_back(this->parse_symbol());
         } else {
-            throw std::runtime_error("Unexpected char: " + std::string(1, c));
+            std::cerr << "Unknown char: " << c << '\n';
+            exit(1);
         }
     }
 
@@ -91,9 +93,11 @@ Token_T Lexer::parse_symbol() {
             end = this->buffer.find_first_of('\n', start);
             break;
 
-        case TOKEN_TYPE::INVALID:
+        /*
+        case TOKEN_TYPE::UNKNOWN:
             throw std::runtime_error("Unexpected symbol: " + std::string(1, symbol));
             break;
+        */
 
         default:
             token.type = type;

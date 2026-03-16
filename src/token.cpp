@@ -29,7 +29,7 @@ TOKEN_TYPE symbol_to_type(char c) {
         case ';':
             return TOKEN_TYPE::SEMI;
         default:
-            return TOKEN_TYPE::INVALID;
+            return TOKEN_TYPE::UNKNOWN;
     }
 }
 
@@ -57,7 +57,7 @@ const std::map<TOKEN_TYPE, std::string> type_to_str_lookup = {
     {TOKEN_TYPE::SEMI, "SEMI"},
     {TOKEN_TYPE::COMMENT, "COMMENT"},
 
-    {TOKEN_TYPE::INVALID, "INVALID"}
+    {TOKEN_TYPE::UNKNOWN, "UNKNOWN"}
 };
 
 const std::string_view type_to_str(TOKEN_TYPE t) {
