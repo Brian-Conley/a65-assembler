@@ -39,6 +39,8 @@ const std::map<TOKEN_TYPE, std::string> type_to_str_lookup = {
     {TOKEN_TYPE::NUMBER_HEX, "NUMBER_HEX"},
     {TOKEN_TYPE::NUMBER_BIN, "NUMBER_BIN"},
 
+    {TOKEN_TYPE::NEWLINE, "NEWLINE"},
+
     {TOKEN_TYPE::HASH, "HASH"},
     {TOKEN_TYPE::DOLLAR, "DOLLAR"},
     {TOKEN_TYPE::PERCENT, "PERCENT"},

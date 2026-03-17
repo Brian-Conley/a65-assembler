@@ -29,6 +29,8 @@ const std::vector<Token_T>& Lexer::tokenize() {
             this->tokens.push_back(this->parse_number());
         } else if (SYMBOLS.find_first_of(c) != SYMBOLS.npos) {
             this->tokens.push_back(this->parse_symbol());
+        } else if (NEWLINE.find_first_of(c) != NEWLINE.npos) {
+            this->tokens.push_back(this->parse_newline());
         } else {
             std::cerr << "Unknown char: " << c << '\n';
             exit(1);
@@ -107,6 +109,19 @@ Token_T Lexer::parse_symbol() {
     if (end == this->buffer.npos) {
         end = this->buffer.size();
     }
+    const size_t len = end - start;
+    token.value = std::string_view(this->buffer.data() + start, len);
+
+    this->advance(len);
+    return token;
+}
+
+Token_T Lexer::parse_newline() {
+    Token_T token;
+    token.type = TOKEN_TYPE::NEWLINE;
+
+    const size_t start = this->idx;
+    const size_t end = start + 1;
     const size_t len = end - start;
     token.value = std::string_view(this->buffer.data() + start, len);
 

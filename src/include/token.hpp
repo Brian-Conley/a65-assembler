@@ -11,6 +11,8 @@ enum class TOKEN_TYPE {
     NUMBER_HEX,
     NUMBER_BIN,
 
+    NEWLINE,    // \n
+
     HASH,       // #
     DOLLAR,     // $
     PERCENT,    // %
