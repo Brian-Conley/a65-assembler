@@ -4,8 +4,6 @@
 #include "include/status_code.hpp"
 #include "include/token.hpp"
 #include <iostream>
-#include <stdexcept>
-#include <system_error>
 
 Lexer::Lexer(const std::string& path) :
     tokenized(false),
@@ -17,6 +15,14 @@ Lexer::Lexer(const std::string& path) :
 const std::vector<Token_T>& Lexer::tokenize() {
     if (this->tokenized)
         return this->tokens;
+
+    // Pre allocate some space, assuming one token roughly every 3 chars.
+    // This decision is based on the fact that 1-3 char tokens
+    //  are extremely common, and reallocating memory for vector
+    //  growth is expensive.
+    if (this->buffer.size() != 0) {
+        this->tokens.reserve(this->buffer.size() / 3);
+    }
 
     while (idx < buffer.size()) {
         idx = buffer.find_first_not_of(WHITESPACE, idx);

@@ -17,6 +17,13 @@ const std::vector<Statement_T>& Parser::parse() {
         return this->statements;
     }
 
+    // Pre allocate some space, assuming one statement roughly every 4 tokens.
+    // This is based on a personal test on a one-million line source file
+    //      where there was one statement per ~4 tokens.
+    if (this->tokens.size() != 0) {
+        this->statements.reserve(this->tokens.size() / 4);
+    }
+
     while (!this->parsed) {
         const TOKEN_TYPE token_type = this->get_token_type(this->idx);
 
@@ -55,7 +62,7 @@ const std::vector<Statement_T>& Parser::parse() {
     return this->statements;
 }
 
-const TOKEN_TYPE Parser::get_token_type(size_t idx) const {
+TOKEN_TYPE Parser::get_token_type(size_t idx) const {
     if (idx >= this->tokens.size()) {
         std::cerr << "Parser::get_token_type() out of bounds\n"
             << "\t              idx: " << idx << '\n'

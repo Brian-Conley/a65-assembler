@@ -16,7 +16,7 @@ class Parser {
         size_t idx;
         std::vector<Statement_T> statements;
 
-        const TOKEN_TYPE get_token_type(size_t idx) const;
+        TOKEN_TYPE get_token_type(size_t idx) const;
         Statement_T parse_statement();
         Argument_T parse_argument();
         bool is_end(size_t idx);

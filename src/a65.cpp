@@ -12,13 +12,7 @@ int main(int argc, char** argv) {
 
     std::string path(argv[1]);
     Lexer lex(path);
-    Parser par(lex.tokenize());
 
-    for (auto s: par.parse()) {
-        std::cout << statement_to_str(lex.tokenize(), s) << '\n';
-    }
-
-    /*
     size_t token_count = 0;
     size_t line_count = 0;
     for (Token_T t : lex.tokenize()) {
@@ -30,7 +24,7 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        std::cout << token_to_str(t);
+        //std::cout << token_to_str(t);
         if (t.type == TOKEN_TYPE::NEWLINE) {
             ++line_count;
         }
@@ -38,6 +32,14 @@ int main(int argc, char** argv) {
 
     std::cout << "Processed " << line_count << " lines containing "
         << token_count << " tokens.\n";
+
+    Parser par(lex.tokenize());
+    std::cout << "Parsed " << par.parse().size() << " statements.\n";
+
+    /*
+    for (auto s: par.parse()) {
+        std::cout << statement_to_str(lex.tokenize(), s) << '\n';
+    }
     */
 
     return 0;
