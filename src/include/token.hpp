@@ -31,10 +31,13 @@ enum class TOKEN_TYPE {
     SEMI,       // ;
     COMMENT,    // derived from SEMI by the Lexer
 
+    END,        // appended to the end of the token vector
     UNKNOWN     // unrecognized token
 };
 
-extern const std::map<TOKEN_TYPE, std::string> type_to_str_lookup;
+extern const std::map<TOKEN_TYPE, std::string> token_type_to_str_lookup;
+
+const std::string_view token_type_to_str(TOKEN_TYPE t);
 
 struct Token_T {
     TOKEN_TYPE type;
@@ -42,7 +45,5 @@ struct Token_T {
 };
 
 TOKEN_TYPE symbol_to_type(char c);
-
-const std::string_view type_to_str(TOKEN_TYPE t);
 
 #endif

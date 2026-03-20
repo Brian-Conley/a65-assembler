@@ -1,6 +1,7 @@
 #include "include/lexer.hpp"
 #include "include/lexer_specification.hpp"
 #include "include/createBuffer.hpp"
+#include "include/status_code.hpp"
 #include "include/token.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -33,9 +34,13 @@ const std::vector<Token_T>& Lexer::tokenize() {
             this->tokens.push_back(this->parse_newline());
         } else {
             std::cerr << "Unknown char: " << c << '\n';
-            exit(1);
+            exit(static_cast<int>(STATUS_CODE::LEXER_ERROR));
         }
     }
+
+    Token_T end_token;
+    end_token.type = TOKEN_TYPE::END;
+    this->tokens.push_back(end_token);
 
     this->tokenized = true;
     return this->tokens;
