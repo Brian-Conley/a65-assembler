@@ -3,6 +3,7 @@
 #include "include/lexer.hpp"
 #include "include/parser.hpp"
 #include "include/type_printers.hpp"
+#include "include/opcodes.hpp"
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -35,6 +36,8 @@ int main(int argc, char** argv) {
 
     Parser par(lex.tokenize());
     std::cout << "Parsed " << par.parse().size() << " statements.\n";
+
+    std::cout << INSTRUCTION_TYPE::NUM_INSTRUCTIONS << '\n';
 
     /*
     for (auto s: par.parse()) {

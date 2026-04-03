@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 4.2 FATAL_ERROR)
 project(a65_assembler)
 
+# Primarily for opcode array designation
+set(CMAKE_CXX_STANDARD 20)
+
 # Build settings
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
 set(INCLUDE_DIR "${SRC_DIR}/include")
