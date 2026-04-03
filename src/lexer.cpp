@@ -1,10 +1,9 @@
 #include "include/lexer.hpp"
 #include "include/lexer_specification.hpp"
 #include "include/createBuffer.hpp"
+#include "include/status_code.hpp"
 #include "include/token.hpp"
 #include <iostream>
-#include <stdexcept>
-#include <system_error>
 
 Lexer::Lexer(const std::string& path) :
     tokenized(false),
@@ -16,6 +15,14 @@ Lexer::Lexer(const std::string& path) :
 const std::vector<Token_T>& Lexer::tokenize() {
     if (this->tokenized)
         return this->tokens;
+
+    // Pre allocate some space, assuming one token roughly every 3 chars.
+    // This decision is based on the fact that 1-3 char tokens
+    //  are extremely common, and reallocating memory for vector
+    //  growth is expensive.
+    if (this->buffer.size() != 0) {
+        this->tokens.reserve(this->buffer.size() / 3);
+    }
 
     while (idx < buffer.size()) {
         idx = buffer.find_first_not_of(WHITESPACE, idx);
@@ -29,11 +36,17 @@ const std::vector<Token_T>& Lexer::tokenize() {
             this->tokens.push_back(this->parse_number());
         } else if (SYMBOLS.find_first_of(c) != SYMBOLS.npos) {
             this->tokens.push_back(this->parse_symbol());
+        } else if (NEWLINE.find_first_of(c) != NEWLINE.npos) {
+            this->tokens.push_back(this->parse_newline());
         } else {
             std::cerr << "Unknown char: " << c << '\n';
-            exit(1);
+            exit(static_cast<int>(STATUS_CODE::LEXER_ERROR));
         }
     }
+
+    Token_T end_token;
+    end_token.type = TOKEN_TYPE::END;
+    this->tokens.push_back(end_token);
 
     this->tokenized = true;
     return this->tokens;
@@ -107,6 +120,19 @@ Token_T Lexer::parse_symbol() {
     if (end == this->buffer.npos) {
         end = this->buffer.size();
     }
+    const size_t len = end - start;
+    token.value = std::string_view(this->buffer.data() + start, len);
+
+    this->advance(len);
+    return token;
+}
+
+Token_T Lexer::parse_newline() {
+    Token_T token;
+    token.type = TOKEN_TYPE::NEWLINE;
+
+    const size_t start = this->idx;
+    const size_t end = start + 1;
     const size_t len = end - start;
     token.value = std::string_view(this->buffer.data() + start, len);
 

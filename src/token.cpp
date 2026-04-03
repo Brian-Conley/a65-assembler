@@ -33,11 +33,13 @@ TOKEN_TYPE symbol_to_type(char c) {
     }
 }
 
-const std::map<TOKEN_TYPE, std::string> type_to_str_lookup = {
+const std::map<TOKEN_TYPE, std::string> token_type_to_str_lookup = {
     {TOKEN_TYPE::IDENTIFIER, "IDENTIFIER"},
     {TOKEN_TYPE::NUMBER_DEC, "NUMBER_DEC"},
     {TOKEN_TYPE::NUMBER_HEX, "NUMBER_HEX"},
     {TOKEN_TYPE::NUMBER_BIN, "NUMBER_BIN"},
+
+    {TOKEN_TYPE::NEWLINE, "NEWLINE"},
 
     {TOKEN_TYPE::HASH, "HASH"},
     {TOKEN_TYPE::DOLLAR, "DOLLAR"},
@@ -57,9 +59,10 @@ const std::map<TOKEN_TYPE, std::string> type_to_str_lookup = {
     {TOKEN_TYPE::SEMI, "SEMI"},
     {TOKEN_TYPE::COMMENT, "COMMENT"},
 
+    {TOKEN_TYPE::END, "END"},
     {TOKEN_TYPE::UNKNOWN, "UNKNOWN"}
 };
 
-const std::string_view type_to_str(TOKEN_TYPE t) {
-    return type_to_str_lookup.at(t);
+const std::string_view token_type_to_str(TOKEN_TYPE t) {
+    return token_type_to_str_lookup.at(t);
 }

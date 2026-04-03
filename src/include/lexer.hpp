@@ -18,6 +18,7 @@ class Lexer {
         Token_T parse_identifier();
         Token_T parse_number();
         Token_T parse_symbol();
+        Token_T parse_newline();
 
         void advance(size_t n);
 };

@@ -3,7 +3,8 @@
 
 #include <string_view>
 
-constexpr std::string_view WHITESPACE = " \t\n\r";
+constexpr std::string_view WHITESPACE = " \t\r";
+constexpr std::string_view NEWLINE = "\n";
 
 constexpr std::string_view IDENTIFIER_START =
     "abcdefghijklmnopqrstuvwxyz"

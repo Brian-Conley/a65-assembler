@@ -11,7 +11,9 @@ target_sources(a65 PRIVATE
     ${SRC_DIR}/a65.cpp
     ${SRC_DIR}/createBuffer.cpp
     ${SRC_DIR}/lexer.cpp
+    ${SRC_DIR}/parser.cpp
     ${SRC_DIR}/token.cpp
+    ${SRC_DIR}/type_printers.cpp
 )
 target_compile_options(a65 PRIVATE
     -Wall
