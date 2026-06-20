@@ -25,10 +25,12 @@ const std::vector<Token_T>& Lexer::tokenize() {
     }
 
     while (idx < buffer.size()) {
+        // Skip all whitespace, return if end of buffer
         idx = buffer.find_first_not_of(WHITESPACE, idx);
         if (idx == buffer.npos)
             return this->tokens;
 
+        // Create token based on what the current char is
         char c = buffer[idx];
         if (IDENTIFIER_START.find_first_of(c) != IDENTIFIER_START.npos) {
             this->tokens.push_back(this->parse_identifier());
@@ -39,11 +41,13 @@ const std::vector<Token_T>& Lexer::tokenize() {
         } else if (NEWLINE.find_first_of(c) != NEWLINE.npos) {
             this->tokens.push_back(this->parse_newline());
         } else {
+            // TODO Improve error handling
             std::cerr << "Unknown char: " << c << '\n';
             exit(static_cast<int>(STATUS_CODE::LEXER_ERROR));
         }
     }
 
+    // Append an end token to the end
     Token_T end_token;
     end_token.type = TOKEN_TYPE::END;
     this->tokens.push_back(end_token);
@@ -53,6 +57,8 @@ const std::vector<Token_T>& Lexer::tokenize() {
 }
 
 Token_T Lexer::parse_identifier() {
+    // Set current char as the start, find the first non-identifier char
+    // Create an identifier token of the content spanning start-end
     const size_t start = this->idx;
 
     size_t end = this->buffer.find_first_not_of(IDENTIFIER_CONTENT, start);
@@ -69,6 +75,8 @@ Token_T Lexer::parse_identifier() {
 }
 
 Token_T Lexer::parse_number() {
+    // Set current char as the start, find the first non-decimal number char
+    // Create a decimal number token of the content spanning start-end
     const size_t start = this->idx;
     size_t end = this->buffer.find_first_not_of(NUMBERS_DEC, start);
     if (end == this->buffer.npos) {
@@ -84,28 +92,37 @@ Token_T Lexer::parse_number() {
 }
 
 Token_T Lexer::parse_symbol() {
+    // Set current char as the start
     const size_t start = this->idx;
     size_t end = start + 1;
     const char symbol = this->buffer[start];
 
+    // Assume the token type based on the symbol, then check edge cases.
     Token_T token;
     TOKEN_TYPE type = symbol_to_type(symbol);
     switch (type) {
         case TOKEN_TYPE::DOLLAR:
+            // Find the first non-hex number char
+            // Create a hex number token of the content spanning start-end
             token.type = TOKEN_TYPE::NUMBER_HEX;
             end = this->buffer.find_first_not_of(NUMBERS_HEX, start+1);
             break;
 
         case TOKEN_TYPE::PERCENT:
+            // Find the first non-binary number char
+            // Create a binary number token of the content spanning start-end
             token.type = TOKEN_TYPE::NUMBER_BIN;
             end = this->buffer.find_first_not_of(NUMBERS_BIN, start+1);
             break;
 
         case TOKEN_TYPE::SEMI:
+            // Find the end of the line
+            // Create a comment token of the line's remaining content
             token.type = TOKEN_TYPE::COMMENT;
             end = this->buffer.find_first_of('\n', start);
             break;
 
+        // TODO Improve error handling
         /*
         case TOKEN_TYPE::UNKNOWN:
             throw std::runtime_error("Unexpected symbol: " + std::string(1, symbol));
@@ -117,6 +134,7 @@ Token_T Lexer::parse_symbol() {
             break;
     }
 
+    // Create the token and return
     if (end == this->buffer.npos) {
         end = this->buffer.size();
     }
@@ -128,6 +146,7 @@ Token_T Lexer::parse_symbol() {
 }
 
 Token_T Lexer::parse_newline() {
+    // Create a newline token and push the index forward.
     Token_T token;
     token.type = TOKEN_TYPE::NEWLINE;
 

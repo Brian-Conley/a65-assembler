@@ -9,6 +9,7 @@ Parser::Parser(const std::vector<Token_T>& tokens):
     tokens(tokens),
     parsed(false),
     idx(0),
+    line(1),
     statements()
 {}
 
@@ -35,12 +36,14 @@ const std::vector<Statement_T>& Parser::parse() {
 
             // Skip the token
             case TOKEN_TYPE::NEWLINE:
+                ++this->line;
             case TOKEN_TYPE::COMMENT:
                 ++this->idx;
                 continue;
                 break;
 
             // Exit if the token is unknown
+            // TODO Improve error handling
             case TOKEN_TYPE::UNKNOWN:
                 std::cerr << "Unknown token:\n"
                     << "\t   idx: " << this->idx << '\n'
@@ -52,6 +55,7 @@ const std::vector<Statement_T>& Parser::parse() {
                 this->parsed = true;
                 break;
             default:
+                // TODO Improve error handling
                 std::cerr << "Unexpected token:\n"
                     << "\t  idx: " << this->idx << '\n'
                     << "\ttoken: " << token_to_str(this->tokens[this->idx]) << '\n';
@@ -63,6 +67,7 @@ const std::vector<Statement_T>& Parser::parse() {
 }
 
 TOKEN_TYPE Parser::get_token_type(size_t idx) const {
+    // TODO Improve error handling
     if (idx >= this->tokens.size()) {
         std::cerr << "Parser::get_token_type() out of bounds\n"
             << "\t              idx: " << idx << '\n'
@@ -82,6 +87,7 @@ Statement_T Parser::parse_statement() {
      * 3. Potential argument following the mnemonic
      */
     Statement_T statement;
+    statement.line = this->line;
 
     TOKEN_TYPE token_type = this->get_token_type(this->idx);
 
@@ -94,7 +100,7 @@ Statement_T Parser::parse_statement() {
             // Check for EOL
             if (this->is_line_terminator(this->idx)) {
                 statement.type = STATEMENT_TYPE::LABEL_ONLY;
-                this->idx += 1;
+                // this->idx += 1;
                 return statement;
             }
 
@@ -140,6 +146,7 @@ Statement_T Parser::parse_statement() {
             statement.type = STATEMENT_TYPE::DIRECTIVE;
             ++this->idx;
 
+            // TODO Improve error handling
             if (get_token_type(this->idx) != TOKEN_TYPE::IDENTIFIER) {
                 std::cerr << "Unexpected token:\n"
                     << "\t  idx: " << this->idx << '\n'
@@ -169,6 +176,7 @@ Statement_T Parser::parse_statement() {
             break;
 
         default:
+            // TODO Improve error handling
             std::cerr << "Unexpected token:\n"
                 << "\t  idx: " << this->idx << '\n'
                 << "\ttoken: " << token_to_str(this->tokens[this->idx]);
@@ -188,6 +196,7 @@ Argument_T Parser::parse_argument() {
             break;
         }
 
+        // TODO Improve error handling
         if (this->idx >= this->tokens.size()) {
             std::cerr << "Parser::parse_argument():\n"
                 << "\tidx exceeded the bounds of the token vector.\n";

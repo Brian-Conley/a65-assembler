@@ -12,6 +12,10 @@ TOKEN_TYPE symbol_to_type(char c) {
             return TOKEN_TYPE::LPAREN;
         case ')':
             return TOKEN_TYPE::RPAREN;
+        case '<':
+            return TOKEN_TYPE::LANGLE;
+        case '>':
+            return TOKEN_TYPE::RANGLE;
         case '+':
             return TOKEN_TYPE::PLUS;
         case '-':
@@ -47,6 +51,9 @@ const std::map<TOKEN_TYPE, std::string> token_type_to_str_lookup = {
 
     {TOKEN_TYPE::LPAREN, "LPAREN"},
     {TOKEN_TYPE::RPAREN, "RPAREN"},
+
+    {TOKEN_TYPE::LANGLE, "LANGLE"},
+    {TOKEN_TYPE::RANGLE, "RANGLE"},
 
     {TOKEN_TYPE::PLUS, "PLUS"},
     {TOKEN_TYPE::MINUS, "MINUS"},
