@@ -62,7 +62,7 @@ class Assembler {
         void dir_res(const Statement_T& s, uint16_t& pc);
         void dir_byte(const Statement_T& s, uint16_t& pc);
         void dir_word(const Statement_T& s, uint16_t& pc);
-        void dir_equ(const Statement_T& s, uint16_t& pc);
+        void dir_equ(const Statement_T& s);
 
         std::optional<uint16_t> resolve_ins_arg(const Argument_T& arg, ADDRESSING_MODE addr_mode);
         std::optional<uint16_t> resolve_arg_ABS(const Argument_T& arg);

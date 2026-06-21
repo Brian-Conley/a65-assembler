@@ -531,7 +531,7 @@ void Assembler::handle_directive(const Statement_T& s, uint16_t& pc) {
         case "res"_hash:  dir_res(s, pc);  break;
         case "byte"_hash: dir_byte(s, pc); break;
         case "word"_hash: dir_word(s, pc); break;
-        case "equ"_hash:  dir_equ(s, pc);  break;
+        case "equ"_hash:  dir_equ(s);  break;
 
         // Planned directives
         //case ".ascii"_hash:
@@ -660,7 +660,7 @@ void Assembler::dir_word(const Statement_T& s, uint16_t& pc) {
     return;
 }
 
-void Assembler::dir_equ(const Statement_T& s, uint16_t& pc) {
+void Assembler::dir_equ(const Statement_T& s) {
 
     if (!s.argument.has_value()) {
         std::cerr << "Error on line " << s.line << ": .equ missing an argument.\n";
@@ -685,10 +685,19 @@ void Assembler::dir_equ(const Statement_T& s, uint16_t& pc) {
         exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
     }
 
+    auto symbol_loc = symbol_table.find(symbol);
+    if (symbol_loc != symbol_table.end()) {
+        if (value.value() != symbol_loc->second) {
+            std::cerr << "Error on line " << s.line << ": Symbol \""
+                      << token_val(arg.start) << "\" is already defined.\n";
+            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        }
+        return;
+    }
+
     bool inserted = symbol_table.insert({symbol, value.value()}).second;
     if (!inserted) {
-        std::cerr << "Error on line " << s.line << ": Symbol \""
-                  << token_val(arg.start) << "\" is already defined.\n";
+        std::cerr << "Error on line " << s.line << ": Failed to assign value to symbol.\n";
         exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
     }
 }
