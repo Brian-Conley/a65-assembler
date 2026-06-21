@@ -31,10 +31,13 @@ class Assembler {
         std::optional<INSTRUCTION_TYPE> determine_instruction_type(const Token_T& t) const;
         ADDRESSING_MODE determine_addressing_mode(INSTRUCTION_TYPE ins, const std::optional<Argument_T>& arg) const;
         size_t get_mode_size(ADDRESSING_MODE mode) const;
-        uint16_t resolve_numeric_token_value(const Token_T& t) const;
-        std::optional<uint16_t> resolve_symbol_address(const std::string_view& s);
-        std::string_view token_val(size_t idx) const;
+
         void emit_byte(uint8_t byte, uint16_t& current_pc);
+
+        std::string_view token_val(size_t idx) const;
+        std::optional<uint16_t> resolve_numeric_token_value(const Token_T& t) const;
+        std::optional<uint16_t> resolve_symbol_address(const std::string_view& s) const;
+        std::optional<uint16_t> resolve_value(const Token_T& t) const;
 
         /**
          * @brief Inserts or overwrites a label's address in the symbol table.

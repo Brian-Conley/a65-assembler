@@ -81,14 +81,6 @@ const std::vector<uint8_t>& Assembler::assemble() {
 
             /* INSTRUCTION TYPE */
 
-            /* Check not needed because it was done in pass 1
-             *
-             if (!s.mnemonic.has_value()) {
-             std::cerr << "Error on line " << s.line << ": No instruction mnemonic found.\n";
-             exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-             }
-             */
-
             std::optional<INSTRUCTION_TYPE> ins_type = determine_instruction_type(tokens[s.mnemonic.value()]);
             if (!ins_type.has_value()) {
                 std::cerr << "Error on line " << s.line << ": Unknown instruction mnemonic "
@@ -359,27 +351,22 @@ ADDRESSING_MODE Assembler::determine_addressing_mode(INSTRUCTION_TYPE ins, const
         }
     }
 
-    uint16_t value;
+    std::optional<uint16_t> value;
     TOKEN_TYPE tok_type = this->tokens[operand_idx].type;
     switch(tok_type) {
         // Look for an associated symbol value.
-        case TOKEN_TYPE::IDENTIFIER: {
-            auto symbol_loc =this->symbol_table.find(this->tokens[operand_idx].value);
-            if (symbol_loc == this->symbol_table.end()) {
-                // Undefined symbol, assume two bytes
-                value = 0xFFFF;
-            } else {
-                value = symbol_loc->second;
-            }
-        }
+        case TOKEN_TYPE::IDENTIFIER:
+            // If the symbol isn't found, assume a 2-byte value
+            value = resolve_symbol_address(tokens[operand_idx].value).value_or(0xFFFF);
             break;
 
         // Resolve numeric value if not a symbol.
         case TOKEN_TYPE::NUMBER_BIN:
         case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            value = resolve_numeric_token_value(this->tokens[operand_idx]);
+        case TOKEN_TYPE::NUMBER_HEX: {
+            value = resolve_numeric_token_value(tokens[operand_idx]);
             break;
+        }
 
         default:
             // TODO Improve error handling
@@ -388,6 +375,12 @@ ADDRESSING_MODE Assembler::determine_addressing_mode(INSTRUCTION_TYPE ins, const
             break;
 
     };
+
+    // TODO Improve error handling
+    if (!value.has_value()) {
+        std::cerr << "Failed to resolve operand value\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
 
     // Distinguish between ABS and ZPG and return.
     if (value <= 0xFF)
@@ -423,7 +416,11 @@ size_t Assembler::get_mode_size(ADDRESSING_MODE mode) const {
     };
 }
 
-uint16_t Assembler::resolve_numeric_token_value(const Token_T& t) const {
+std::string_view Assembler::token_val(size_t idx) const {
+    return tokens.at(idx).value;
+}
+
+std::optional<uint16_t> Assembler::resolve_numeric_token_value(const Token_T& t) const {
     size_t base = 10;
     switch(t.type) {
         case TOKEN_TYPE::NUMBER_DEC:
@@ -453,8 +450,7 @@ uint16_t Assembler::resolve_numeric_token_value(const Token_T& t) const {
             continue;
 
         if (digit >= base) {
-            std::cerr << "Invalid digit in token\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            return std::nullopt;
         }
 
         value = value * base + digit;
@@ -463,7 +459,7 @@ uint16_t Assembler::resolve_numeric_token_value(const Token_T& t) const {
     return value;
 }
 
-std::optional<uint16_t> Assembler::resolve_symbol_address(const std::string_view& s) {
+std::optional<uint16_t> Assembler::resolve_symbol_address(const std::string_view& s) const {
     auto symbol_loc = symbol_table.find(s);
     if (symbol_loc == symbol_table.end()) {
         return std::nullopt;
@@ -471,9 +467,19 @@ std::optional<uint16_t> Assembler::resolve_symbol_address(const std::string_view
     return symbol_loc->second;
 }
 
+std::optional<uint16_t> Assembler::resolve_value(const Token_T& t) const {
+    switch(t.type) {
+        case TOKEN_TYPE::NUMBER_BIN:
+        case TOKEN_TYPE::NUMBER_DEC:
+        case TOKEN_TYPE::NUMBER_HEX:
+            return resolve_numeric_token_value(t);
 
-std::string_view Assembler::token_val(size_t idx) const {
-    return tokens.at(idx).value;
+        case TOKEN_TYPE::IDENTIFIER:
+            return resolve_symbol_address(t.value);
+
+        default:
+            return std::nullopt;
+    };
 }
 
 void Assembler::emit_byte(uint8_t byte, uint16_t& current_pc) {
@@ -550,29 +556,13 @@ void Assembler::dir_org(const Statement_T& s, uint16_t& pc) {
         exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
     }
 
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX: {
-            pc = resolve_numeric_token_value(tokens[arg.start]);
-            return;
-        }
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            auto symbol_addr = resolve_symbol_address(token_val(arg.start));
-            if (!symbol_addr.has_value()) {
-                std::cerr << "Error on line " << s.line << ": Undefined symbol \""
-                          << token_val(arg.start) << "\"\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-            }
-            pc = symbol_addr.value();
-            return;
-        }
-
-        default:
-            std::cerr << "Error on line " << s.line << ": .org expects a numeric or label argument.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-    };
+    std::optional<uint16_t> value = resolve_value(tokens[arg.start]);
+    if (!value.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    pc = value.value();
+    return;
 }
 
 void Assembler::dir_res(const Statement_T& s, uint16_t& pc) {
@@ -588,29 +578,13 @@ void Assembler::dir_res(const Statement_T& s, uint16_t& pc) {
         exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
     }
 
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX: {
-            pc += resolve_numeric_token_value(tokens[arg.start]);
-            return;
-        }
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            auto symbol_addr = resolve_symbol_address(token_val(arg.start));
-            if (!symbol_addr.has_value()) {
-                std::cerr << "Error on line " << s.line << ": Undefined symbol \""
-                          << token_val(arg.start) << "\"\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-            }
-            pc += symbol_addr.value();
-            return;
-        }
-
-        default:
-            std::cerr << "Error on line " << s.line << ": .res expects a numeric or label argument.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-    };
+    std::optional<uint16_t> value = resolve_value(tokens[arg.start]);
+    if (!value.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    pc += value.value();
+    return;
 }
 
 void Assembler::dir_byte(const Statement_T& s, uint16_t& pc) {
@@ -623,49 +597,28 @@ void Assembler::dir_byte(const Statement_T& s, uint16_t& pc) {
     const Argument_T& arg = s.argument.value();
     bool expects_num = true;
     for (size_t i = arg.start; i < arg.end; ++i) {
-        switch(tokens[i].type) {
-            case TOKEN_TYPE::NUMBER_BIN:
-            case TOKEN_TYPE::NUMBER_DEC:
-            case TOKEN_TYPE::NUMBER_HEX: {
-                if (!expects_num){
-                    std::cerr << "Error on line " << s.line << ": .byte expected a comma.\n";
-                    exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-                }
-                emit_byte(resolve_numeric_token_value(tokens[i]), pc);
-                expects_num = false;
-                break;
-            }
-            case TOKEN_TYPE::IDENTIFIER: {
-                if (!expects_num){
-                    std::cerr << "Error on line " << s.line << ": .byte expected a comma.\n";
-                    exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-                }
-
-                auto symbol_addr = resolve_symbol_address(token_val(i));
-                if (!symbol_addr.has_value()) {
-                    std::cerr << "Error on line " << s.line << ": Undefined symbol \""
-                              << token_val(i) << "\"\n";
-                    exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-                }
-                // Default to low byte
-                emit_byte(symbol_addr.value() & 0xFF, pc);
-                expects_num = false;
-                break;
-            }
-
-            case TOKEN_TYPE::COMMA: {
-                if (expects_num) {
-                    std::cerr << "Error on line " << s.line << ": .byte expected a numeric value or label.\n";
-                    exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-                }
-                expects_num = true;
-                break;
-            }
-
-            default:
-                std::cerr << "Error on line " << s.line << ": .byte expects a numeric argument.\n";
+        if (expects_num) {
+            TOKEN_TYPE tt = tokens[i].type;
+            if (tt != TOKEN_TYPE::NUMBER_HEX && tt != TOKEN_TYPE::NUMBER_BIN
+                    && tt != TOKEN_TYPE::NUMBER_DEC && tt != TOKEN_TYPE::IDENTIFIER) {
+                std::cerr << "Error on line " << s.line << ": .byte expected a numeric value or label.\n";
                 exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-        };
+            }
+            auto value = resolve_value(tokens[i]);
+            if (!value.has_value()) {
+                std::cerr << "Error on line " << s.line << ": Failed to resolve value.\n";
+                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            }
+            emit_byte(value.value() & 0xFF, pc);
+            expects_num = false;
+            continue;
+        }
+
+        if (tokens[i].type != TOKEN_TYPE::COMMA) {
+            std::cerr << "Error on line " << s.line << ": .byte expected a comma.\n";
+            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        }
+        expects_num = true;
     }
     return;
 }
@@ -673,59 +626,36 @@ void Assembler::dir_byte(const Statement_T& s, uint16_t& pc) {
 void Assembler::dir_word(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .byte missing an argument.\n";
+        std::cerr << "Error on line " << s.line << ": .word missing an argument.\n";
         exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
     }
 
     const Argument_T& arg = s.argument.value();
     bool expects_num = true;
     for (size_t i = arg.start; i < arg.end; ++i) {
-        switch(tokens[i].type) {
-            case TOKEN_TYPE::NUMBER_BIN:
-            case TOKEN_TYPE::NUMBER_DEC:
-            case TOKEN_TYPE::NUMBER_HEX: {
-                if (!expects_num){
-                    std::cerr << "Error on line " << s.line << ": .word expected a comma.\n";
-                    exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-                }
-                uint16_t val = resolve_numeric_token_value(tokens[i]);
-                emit_byte(val & 0xFF, pc);
-                emit_byte((val >> 8) & 0xFF, pc);
-                expects_num = false;
-                break;
-            }
-            case TOKEN_TYPE::IDENTIFIER: {
-                if (!expects_num){
-                    std::cerr << "Error on line " << s.line << ": .word expected a comma.\n";
-                    exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-                }
-
-                auto symbol_addr = resolve_symbol_address(token_val(i));
-                if (!symbol_addr.has_value()) {
-                    std::cerr << "Error on line " << s.line << ": Undefined symbol \""
-                              << token_val(i) << "\"\n";
-                    exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-                }
-                uint16_t val = symbol_addr.value();
-                emit_byte(val & 0xFF, pc);
-                emit_byte((val >> 8) & 0xFF, pc);
-                expects_num = false;
-                break;
-            }
-
-            case TOKEN_TYPE::COMMA: {
-                if (expects_num) {
-                    std::cerr << "Error on line " << s.line << ": .word expected a numeric value or label.\n";
-                    exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-                }
-                expects_num = true;
-                break;
-            }
-
-            default:
-                std::cerr << "Error on line " << s.line << ": .word expects a numeric value or label.\n";
+        if (expects_num) {
+            TOKEN_TYPE tt = tokens[i].type;
+            if (tt != TOKEN_TYPE::NUMBER_HEX && tt != TOKEN_TYPE::NUMBER_BIN
+                    && tt != TOKEN_TYPE::NUMBER_DEC && tt != TOKEN_TYPE::IDENTIFIER) {
+                std::cerr << "Error on line " << s.line << ": .word expected a numeric value or label.\n";
                 exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-        };
+            }
+            auto value = resolve_value(tokens[i]);
+            if (!value.has_value()) {
+                std::cerr << "Error on line " << s.line << ": Failed to resolve value.\n";
+                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            }
+            emit_byte(value.value() & 0xFF, pc);
+            emit_byte((value.value() >> 8) & 0xFF, pc);
+            expects_num = false;
+            continue;
+        }
+
+        if (tokens[i].type != TOKEN_TYPE::COMMA) {
+            std::cerr << "Error on line " << s.line << ": .word expected a comma.\n";
+            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        }
+        expects_num = true;
     }
     return;
 }
@@ -749,33 +679,13 @@ void Assembler::dir_equ(const Statement_T& s, uint16_t& pc) {
     }
 
     const std::string_view& symbol = token_val(arg.start);
-    uint16_t val;
-    switch(tokens[arg.start + 1].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[arg.start + 1]);
-            break;
+    auto value = resolve_value(tokens[arg.start + 1]);
+    if (!value.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
 
-        case TOKEN_TYPE::IDENTIFIER: {
-            auto symbol_addr = resolve_symbol_address(token_val(arg.start + 1));
-            if (!symbol_addr.has_value()) {
-                std::cerr << "Error on line " << s.line << ": Undefined symbol \""
-                          << token_val(arg.start + 1) << "\"\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-            }
-            val = symbol_addr.value();
-        }
-        break;
-
-        default:
-            std::cerr << "Error on line " << s.line << ": .equ expects a numeric value or label.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-            break;
-
-    };
-
-    bool inserted = symbol_table.insert({symbol, val}).second;
+    bool inserted = symbol_table.insert({symbol, value.value()}).second;
     if (!inserted) {
         std::cerr << "Error on line " << s.line << ": Symbol \""
                   << token_val(arg.start) << "\" is already defined.\n";
@@ -809,16 +719,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ABS(const Argument_T& arg) {
     if (arg.end - arg.start != 1)
         return std::nullopt;
 
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            return resolve_numeric_token_value(tokens[arg.start]);
-        case TOKEN_TYPE::IDENTIFIER:
-            return resolve_symbol_address(token_val(arg.start));
-        default:
-            return std::nullopt;
-    };
+    return resolve_value(tokens[arg.start]);
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_ABSX(const Argument_T& arg) {
@@ -826,25 +727,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ABSX(const Argument_T& arg) {
     if (arg.end - arg.start != 3)
         return std::nullopt;
 
-    uint16_t val;
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[arg.start]);
-            break;
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            std::optional<uint16_t> optval = resolve_symbol_address(token_val(arg.start));
-            if (!optval.has_value())
-                return std::nullopt;
-            val = optval.value();
-        }
-            break;
-
-        default:
-            return std::nullopt;
-    };
+    auto value = resolve_value(tokens[arg.start]);
 
     if (tokens[arg.start + 1].type != TOKEN_TYPE::COMMA)
         return std::nullopt;
@@ -853,7 +736,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ABSX(const Argument_T& arg) {
     if (xval != "x" && xval != "X")
         return std::nullopt;
 
-    return val;
+    return value;
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_ABSY(const Argument_T& arg) {
@@ -861,25 +744,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ABSY(const Argument_T& arg) {
     if (arg.end - arg.start != 3)
         return std::nullopt;
 
-    uint16_t val;
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[arg.start]);
-            break;
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            std::optional<uint16_t> optval = resolve_symbol_address(token_val(arg.start));
-            if (!optval.has_value())
-                return std::nullopt;
-            val = optval.value();
-        }
-            break;
-
-        default:
-            return std::nullopt;
-    };
+    auto value = resolve_value(tokens[arg.start]);
 
     if (tokens[arg.start + 1].type != TOKEN_TYPE::COMMA)
         return std::nullopt;
@@ -888,7 +753,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ABSY(const Argument_T& arg) {
     if (yval != "y" && yval != "Y")
         return std::nullopt;
 
-    return val;
+    return value;
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_IMM(const Argument_T& arg) {
@@ -899,28 +764,7 @@ std::optional<uint16_t> Assembler::resolve_arg_IMM(const Argument_T& arg) {
     if (tokens[arg.start].type != TOKEN_TYPE::HASH)
         return std::nullopt;
 
-
-    uint16_t val;
-    switch(tokens[arg.start + 1].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[arg.start + 1]);
-            break;
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            std::optional<uint16_t> optval = resolve_symbol_address(token_val(arg.start + 1));
-            if (!optval.has_value())
-                return std::nullopt;
-            val = optval.value();
-        }
-            break;
-
-        default:
-            return std::nullopt;
-    };
-
-    return val;
+    return resolve_value(tokens[arg.start + 1]);
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_IND(const Argument_T& arg) {
@@ -933,31 +777,13 @@ std::optional<uint16_t> Assembler::resolve_arg_IND(const Argument_T& arg) {
         return std::nullopt;
     ++idx;
 
-    uint16_t val;
-    switch(tokens[idx].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[idx]);
-            break;
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            std::optional<uint16_t> optval = resolve_symbol_address(token_val(idx));
-            if (!optval.has_value())
-                return std::nullopt;
-            val = optval.value();
-        }
-            break;
-
-        default:
-            return std::nullopt;
-    };
+    auto value = resolve_value(tokens[idx]);
     ++idx;
 
     if (tokens[idx].type != TOKEN_TYPE::RPAREN)
         return std::nullopt;
 
-    return val;
+    return value;
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_INDX(const Argument_T& arg) {
@@ -970,25 +796,7 @@ std::optional<uint16_t> Assembler::resolve_arg_INDX(const Argument_T& arg) {
         return std::nullopt;
     ++idx;
 
-    uint16_t val;
-    switch(tokens[idx].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[idx]);
-            break;
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            std::optional<uint16_t> optval = resolve_symbol_address(token_val(idx));
-            if (!optval.has_value())
-                return std::nullopt;
-            val = optval.value();
-        }
-            break;
-
-        default:
-            return std::nullopt;
-    };
+    auto value = resolve_value(tokens[idx]);
     ++idx;
 
     if (tokens[idx].type != TOKEN_TYPE::COMMA)
@@ -1005,7 +813,7 @@ std::optional<uint16_t> Assembler::resolve_arg_INDX(const Argument_T& arg) {
     if (tokens[idx].type != TOKEN_TYPE::RPAREN)
         return std::nullopt;
 
-    return val;
+    return value;
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_INDY(const Argument_T& arg) {
@@ -1018,25 +826,7 @@ std::optional<uint16_t> Assembler::resolve_arg_INDY(const Argument_T& arg) {
         return std::nullopt;
     ++idx;
 
-    uint16_t val;
-    switch(tokens[idx].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[idx]);
-            break;
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            std::optional<uint16_t> optval = resolve_symbol_address(token_val(idx));
-            if (!optval.has_value())
-                return std::nullopt;
-            val = optval.value();
-        }
-            break;
-
-        default:
-            return std::nullopt;
-    };
+    auto value = resolve_value(tokens[idx]);
     ++idx;
 
     if (tokens[idx].type != TOKEN_TYPE::RPAREN)
@@ -1054,7 +844,7 @@ std::optional<uint16_t> Assembler::resolve_arg_INDY(const Argument_T& arg) {
         return std::nullopt;
     ++idx;
 
-    return val;
+    return value;
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_REL(const Argument_T& arg) {
@@ -1062,16 +852,7 @@ std::optional<uint16_t> Assembler::resolve_arg_REL(const Argument_T& arg) {
     if (arg.end - arg.start != 1)
         return std::nullopt;
 
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            return resolve_numeric_token_value(tokens[arg.start]);
-        case TOKEN_TYPE::IDENTIFIER:
-            return resolve_symbol_address(token_val(arg.start));
-        default:
-            return std::nullopt;
-    };
+    return resolve_value(tokens[arg.start]);
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_ZPG(const Argument_T& arg) {
@@ -1079,16 +860,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ZPG(const Argument_T& arg) {
     if (arg.end - arg.start != 1)
         return std::nullopt;
 
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            return resolve_numeric_token_value(tokens[arg.start]);
-        case TOKEN_TYPE::IDENTIFIER:
-            return resolve_symbol_address(token_val(arg.start));
-        default:
-            return std::nullopt;
-    };
+    return resolve_value(tokens[arg.start]);
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_ZPGX(const Argument_T& arg) {
@@ -1096,25 +868,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ZPGX(const Argument_T& arg) {
     if (arg.end - arg.start != 3)
         return std::nullopt;
 
-    uint16_t val;
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[arg.start]);
-            break;
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            std::optional<uint16_t> optval = resolve_symbol_address(token_val(arg.start));
-            if (!optval.has_value())
-                return std::nullopt;
-            val = optval.value();
-        }
-            break;
-
-        default:
-            return std::nullopt;
-    };
+    auto value = resolve_value(tokens[arg.start]);
 
     if (tokens[arg.start + 1].type != TOKEN_TYPE::COMMA)
         return std::nullopt;
@@ -1123,7 +877,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ZPGX(const Argument_T& arg) {
     if (xval != "x" && xval != "X")
         return std::nullopt;
 
-    return val;
+    return value;
 }
 
 std::optional<uint16_t> Assembler::resolve_arg_ZPGY(const Argument_T& arg) {
@@ -1131,25 +885,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ZPGY(const Argument_T& arg) {
     if (arg.end - arg.start != 3)
         return std::nullopt;
 
-    uint16_t val;
-    switch(tokens[arg.start].type) {
-        case TOKEN_TYPE::NUMBER_BIN:
-        case TOKEN_TYPE::NUMBER_DEC:
-        case TOKEN_TYPE::NUMBER_HEX:
-            val = resolve_numeric_token_value(tokens[arg.start]);
-            break;
-
-        case TOKEN_TYPE::IDENTIFIER: {
-            std::optional<uint16_t> optval = resolve_symbol_address(token_val(arg.start));
-            if (!optval.has_value())
-                return std::nullopt;
-            val = optval.value();
-        }
-            break;
-
-        default:
-            return std::nullopt;
-    };
+    auto value = resolve_value(tokens[arg.start]);
 
     if (tokens[arg.start + 1].type != TOKEN_TYPE::COMMA)
         return std::nullopt;
@@ -1158,6 +894,6 @@ std::optional<uint16_t> Assembler::resolve_arg_ZPGY(const Argument_T& arg) {
     if (yval != "y" && yval != "Y")
         return std::nullopt;
 
-    return val;
+    return value;
 }
 
