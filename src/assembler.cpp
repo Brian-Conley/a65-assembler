@@ -532,11 +532,11 @@ void Assembler::handle_directive(const Statement_T& s, uint16_t& pc) {
         case "byte"_hash: dir_byte(s, pc); break;
         case "word"_hash: dir_word(s, pc); break;
         case "equ"_hash:  dir_equ(s);  break;
+        case "fill"_hash: dir_fill(s, pc); break;
 
         // Planned directives
         //case ".ascii"_hash:
         //case ".align"_hash:
-        //case ".fill"_hash:
         default:
             std::cerr << "Error on line " << s.line << ": Unknown directive.\n";
             exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
@@ -699,6 +699,44 @@ void Assembler::dir_equ(const Statement_T& s) {
     if (!inserted) {
         std::cerr << "Error on line " << s.line << ": Failed to assign value to symbol.\n";
         exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+}
+
+void Assembler::dir_fill(const Statement_T s, uint16_t& pc) {
+
+    if (!s.argument.has_value()) {
+        std::cerr << "Error on line " << s.line << ": .fill missing an argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    auto arg = s.argument.value();
+
+    if (arg.end - arg.start != 3) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    size_t idx = arg.start;
+    auto range = resolve_value(tokens[idx]);
+    if (!range.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve first parameter value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    ++idx;
+
+    if (tokens[idx].type != TOKEN_TYPE::COMMA) {
+        std::cerr << "Error on line " << s.line << ": Expected a comma between parameters.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    ++idx;
+
+    auto value = resolve_value(tokens[idx]);
+    if (!value.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve second parameter value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    for (uint16_t i = 0; i < range.value(); ++i) {
+        emit_byte(value.value(), pc);
     }
 }
 
