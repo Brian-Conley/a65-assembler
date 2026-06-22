@@ -4,8 +4,10 @@
 #include "include/token.hpp"
 #include "include/status_code.hpp"
 #include "include/hash.hpp"
+#include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string_view>
 
@@ -534,9 +536,8 @@ void Assembler::handle_directive(const Statement_T& s, uint16_t& pc) {
         case "equ"_hash:   dir_equ(s);  break;
         case "fill"_hash:  dir_fill(s, pc); break;
         case "ascii"_hash: dir_ascii(s, pc); break;
+        case "align"_hash: dir_align(s, pc); break;
 
-        // Planned directives
-        //case ".align"_hash:
         default:
             std::cerr << "Error on line " << s.line << ": Unknown directive.\n";
             exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
@@ -761,6 +762,38 @@ void Assembler::dir_ascii(const Statement_T& s, uint16_t& pc) {
     }
 
 }
+
+void Assembler::dir_align(const Statement_T& s, uint16_t& pc) {
+
+    if (!s.argument.has_value()) {
+        std::cerr << "Error on line " << s.line << ": .align missing an argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    auto arg = s.argument.value();
+
+    if (arg.end - arg.start != 1) {
+        std::cerr << "Error on line " << s.line << ": .align expects exactly one argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    auto value = resolve_value(tokens[arg.start]);
+    if (!value.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    uint16_t alignment = value.value();
+    if (alignment == 0 || (alignment & (alignment - 1)) != 0) {
+        std::cerr << "Error on line " << s.line << ": Argument must be a power of 2.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    uint16_t remainder = pc % alignment;
+    uint16_t padding = (remainder == 0) ? 0 : (alignment - remainder);
+    for (uint16_t i = 0; i < padding; ++i) {
+        emit_byte(0x00, pc);
+    }
+};
 
 std::optional<uint16_t> Assembler::resolve_ins_arg(const Argument_T& arg, ADDRESSING_MODE addr_mode) const {
 
