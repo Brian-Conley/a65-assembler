@@ -122,6 +122,11 @@ Token_T Lexer::parse_symbol() {
             end = this->buffer.find_first_of('\n', start);
             break;
 
+        case TOKEN_TYPE::QUOTE:
+            token.type = TOKEN_TYPE::STRING_LITERAL;
+            end = this->buffer.find_first_of('\"', start+1);
+            break;
+
         // TODO Improve error handling
         /*
         case TOKEN_TYPE::UNKNOWN:

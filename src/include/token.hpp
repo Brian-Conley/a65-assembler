@@ -33,6 +33,8 @@ enum class TOKEN_TYPE {
     COLON,      // :
     SEMI,       // ;
     COMMENT,    // derived from SEMI by the Lexer
+    QUOTE,      // "
+    STRING_LITERAL, // derived from QUOTE by the Lexer
 
     END,        // appended to the end of the token vector
     UNKNOWN     // unrecognized token

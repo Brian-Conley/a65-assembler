@@ -527,15 +527,15 @@ void Assembler::handle_directive(const Statement_T& s, uint16_t& pc) {
     }
 
     switch(hash_djb2(token_val(s.mnemonic.value()))) {
-        case "org"_hash:  dir_org(s, pc);  break;
-        case "res"_hash:  dir_res(s, pc);  break;
-        case "byte"_hash: dir_byte(s, pc); break;
-        case "word"_hash: dir_word(s, pc); break;
-        case "equ"_hash:  dir_equ(s);  break;
-        case "fill"_hash: dir_fill(s, pc); break;
+        case "org"_hash:   dir_org(s, pc);  break;
+        case "res"_hash:   dir_res(s, pc);  break;
+        case "byte"_hash:  dir_byte(s, pc); break;
+        case "word"_hash:  dir_word(s, pc); break;
+        case "equ"_hash:   dir_equ(s);  break;
+        case "fill"_hash:  dir_fill(s, pc); break;
+        case "ascii"_hash: dir_ascii(s, pc); break;
 
         // Planned directives
-        //case ".ascii"_hash:
         //case ".align"_hash:
         default:
             std::cerr << "Error on line " << s.line << ": Unknown directive.\n";
@@ -702,7 +702,7 @@ void Assembler::dir_equ(const Statement_T& s) {
     }
 }
 
-void Assembler::dir_fill(const Statement_T s, uint16_t& pc) {
+void Assembler::dir_fill(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
         std::cerr << "Error on line " << s.line << ": .fill missing an argument.\n";
@@ -738,6 +738,28 @@ void Assembler::dir_fill(const Statement_T s, uint16_t& pc) {
     for (uint16_t i = 0; i < range.value(); ++i) {
         emit_byte(value.value(), pc);
     }
+}
+
+void Assembler::dir_ascii(const Statement_T& s, uint16_t& pc) {
+
+    if (!s.argument.has_value()) {
+        std::cerr << "Error on line " << s.line << ": .ascii missing an argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    auto arg = s.argument.value();
+
+    size_t idx = arg.start;
+    if (tokens[idx].type != TOKEN_TYPE::STRING_LITERAL) {
+        std::cerr << "Error on line " << s.line << ": .ascii expects a string literal.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    for (auto c : tokens[idx].value) {
+        if (c != '\"') {
+            emit_byte(c, pc);
+        }
+    }
+
 }
 
 std::optional<uint16_t> Assembler::resolve_ins_arg(const Argument_T& arg, ADDRESSING_MODE addr_mode) const {

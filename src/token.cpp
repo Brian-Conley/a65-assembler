@@ -32,6 +32,8 @@ TOKEN_TYPE symbol_to_type(char c) {
             return TOKEN_TYPE::COLON;
         case ';':
             return TOKEN_TYPE::SEMI;
+        case '\"':
+            return TOKEN_TYPE::QUOTE;
         default:
             return TOKEN_TYPE::UNKNOWN;
     }
@@ -65,6 +67,8 @@ const std::map<TOKEN_TYPE, std::string> token_type_to_str_lookup = {
     {TOKEN_TYPE::COLON, "COLON"},
     {TOKEN_TYPE::SEMI, "SEMI"},
     {TOKEN_TYPE::COMMENT, "COMMENT"},
+    {TOKEN_TYPE::QUOTE, "QUOTE"},
+    {TOKEN_TYPE::STRING_LITERAL, "STRING_LITERAL"},
 
     {TOKEN_TYPE::END, "END"},
     {TOKEN_TYPE::UNKNOWN, "UNKNOWN"}

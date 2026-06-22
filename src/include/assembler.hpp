@@ -120,7 +120,8 @@ class Assembler {
         void dir_byte(const Statement_T& s, uint16_t& pc);
         void dir_word(const Statement_T& s, uint16_t& pc);
         void dir_equ(const Statement_T& s);
-        void dir_fill(const Statement_T s, uint16_t& pc);
+        void dir_fill(const Statement_T& s, uint16_t& pc);
+        void dir_ascii(const Statement_T& s, uint16_t& pc);
         ///@}
 
         /**
