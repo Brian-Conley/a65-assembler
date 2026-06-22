@@ -28,6 +28,6 @@ constexpr std::string_view NUMBERS_BIN =
     "01";
 
 constexpr std::string_view SYMBOLS =
-    "#$%()+-*/,.:;";
+    "#$%()+-*/,.:;\"";
 
 #endif

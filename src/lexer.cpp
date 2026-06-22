@@ -6,9 +6,9 @@
 #include <iostream>
 
 Lexer::Lexer(const std::string& path) :
-    tokenized(false),
-    tokens(),
     buffer(create_file_buffer(path)),
+    tokens(),
+    tokenized(false),
     idx(0)
 {}
 
@@ -120,6 +120,11 @@ Token_T Lexer::parse_symbol() {
             // Create a comment token of the line's remaining content
             token.type = TOKEN_TYPE::COMMENT;
             end = this->buffer.find_first_of('\n', start);
+            break;
+
+        case TOKEN_TYPE::QUOTE:
+            token.type = TOKEN_TYPE::STRING_LITERAL;
+            end = this->buffer.find_first_of('\"', start+1);
             break;
 
         // TODO Improve error handling

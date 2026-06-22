@@ -9,9 +9,11 @@
 #include <optional>
 #include <string_view>
 
-Assembler::Assembler(const std::vector<Token_T>& tokens,
-        const std::vector<Statement_T>& statements) :
-    tokens(tokens), statements(statements), assembled(false), reset_vector(0x0A00)
+Assembler::Assembler(const std::vector<Token_T>& tokens, const std::vector<Statement_T>& statements) :
+    tokens(tokens),
+    statements(statements),
+    assembled(false),
+    reset_vector(0x0A00)
 {}
 
 const std::vector<uint8_t>& Assembler::assemble() {
@@ -527,16 +529,15 @@ void Assembler::handle_directive(const Statement_T& s, uint16_t& pc) {
     }
 
     switch(hash_djb2(token_val(s.mnemonic.value()))) {
-        case "org"_hash:  dir_org(s, pc);  break;
-        case "res"_hash:  dir_res(s, pc);  break;
-        case "byte"_hash: dir_byte(s, pc); break;
-        case "word"_hash: dir_word(s, pc); break;
-        case "equ"_hash:  dir_equ(s);  break;
+        case "org"_hash:   dir_org(s, pc);  break;
+        case "res"_hash:   dir_res(s, pc);  break;
+        case "byte"_hash:  dir_byte(s, pc); break;
+        case "word"_hash:  dir_word(s, pc); break;
+        case "equ"_hash:   dir_equ(s);  break;
+        case "fill"_hash:  dir_fill(s, pc); break;
+        case "ascii"_hash: dir_ascii(s, pc); break;
+        case "align"_hash: dir_align(s, pc); break;
 
-        // Planned directives
-        //case ".ascii"_hash:
-        //case ".align"_hash:
-        //case ".fill"_hash:
         default:
             std::cerr << "Error on line " << s.line << ": Unknown directive.\n";
             exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
@@ -701,6 +702,98 @@ void Assembler::dir_equ(const Statement_T& s) {
         exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
     }
 }
+
+void Assembler::dir_fill(const Statement_T& s, uint16_t& pc) {
+
+    if (!s.argument.has_value()) {
+        std::cerr << "Error on line " << s.line << ": .fill missing an argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    auto arg = s.argument.value();
+
+    if (arg.end - arg.start != 3) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    size_t idx = arg.start;
+    auto range = resolve_value(tokens[idx]);
+    if (!range.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve first parameter value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    ++idx;
+
+    if (tokens[idx].type != TOKEN_TYPE::COMMA) {
+        std::cerr << "Error on line " << s.line << ": Expected a comma between parameters.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    ++idx;
+
+    auto value = resolve_value(tokens[idx]);
+    if (!value.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve second parameter value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    for (uint16_t i = 0; i < range.value(); ++i) {
+        emit_byte(value.value(), pc);
+    }
+}
+
+void Assembler::dir_ascii(const Statement_T& s, uint16_t& pc) {
+
+    if (!s.argument.has_value()) {
+        std::cerr << "Error on line " << s.line << ": .ascii missing an argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    auto arg = s.argument.value();
+
+    size_t idx = arg.start;
+    if (tokens[idx].type != TOKEN_TYPE::STRING_LITERAL) {
+        std::cerr << "Error on line " << s.line << ": .ascii expects a string literal.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    for (auto c : tokens[idx].value) {
+        if (c != '\"') {
+            emit_byte(c, pc);
+        }
+    }
+
+}
+
+void Assembler::dir_align(const Statement_T& s, uint16_t& pc) {
+
+    if (!s.argument.has_value()) {
+        std::cerr << "Error on line " << s.line << ": .align missing an argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+    auto arg = s.argument.value();
+
+    if (arg.end - arg.start != 1) {
+        std::cerr << "Error on line " << s.line << ": .align expects exactly one argument.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    auto value = resolve_value(tokens[arg.start]);
+    if (!value.has_value()) {
+        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    uint16_t alignment = value.value();
+    if (alignment == 0 || (alignment & (alignment - 1)) != 0) {
+        std::cerr << "Error on line " << s.line << ": Argument must be a power of 2.\n";
+        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+    }
+
+    uint16_t remainder = pc % alignment;
+    uint16_t padding = (remainder == 0) ? 0 : (alignment - remainder);
+    for (uint16_t i = 0; i < padding; ++i) {
+        emit_byte(0x00, pc);
+    }
+};
 
 std::optional<uint16_t> Assembler::resolve_ins_arg(const Argument_T& arg, ADDRESSING_MODE addr_mode) const {
 

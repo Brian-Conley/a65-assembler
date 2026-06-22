@@ -7,10 +7,10 @@
 
 Parser::Parser(const std::vector<Token_T>& tokens):
     tokens(tokens),
+    statements(),
     parsed(false),
-    idx(0),
     line(1),
-    statements()
+    idx(0)
 {}
 
 const std::vector<Statement_T>& Parser::parse() {
@@ -37,6 +37,8 @@ const std::vector<Statement_T>& Parser::parse() {
             // Skip the token
             case TOKEN_TYPE::NEWLINE:
                 ++this->line;
+                ++this->idx;
+                continue;
             case TOKEN_TYPE::COMMENT:
                 ++this->idx;
                 continue;
