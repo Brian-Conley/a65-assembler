@@ -702,7 +702,7 @@ void Assembler::dir_equ(const Statement_T& s) {
     }
 }
 
-std::optional<uint16_t> Assembler::resolve_ins_arg(const Argument_T& arg, ADDRESSING_MODE addr_mode) {
+std::optional<uint16_t> Assembler::resolve_ins_arg(const Argument_T& arg, ADDRESSING_MODE addr_mode) const {
 
     switch (addr_mode) {
 
@@ -723,7 +723,7 @@ std::optional<uint16_t> Assembler::resolve_ins_arg(const Argument_T& arg, ADDRES
     }
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_ABS(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_ABS(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 1)
         return std::nullopt;
@@ -731,7 +731,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ABS(const Argument_T& arg) {
     return resolve_value(tokens[arg.start]);
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_ABSX(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_ABSX(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 3)
         return std::nullopt;
@@ -748,7 +748,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ABSX(const Argument_T& arg) {
     return value;
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_ABSY(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_ABSY(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 3)
         return std::nullopt;
@@ -765,7 +765,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ABSY(const Argument_T& arg) {
     return value;
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_IMM(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_IMM(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 2)
         return std::nullopt;
@@ -776,7 +776,7 @@ std::optional<uint16_t> Assembler::resolve_arg_IMM(const Argument_T& arg) {
     return resolve_value(tokens[arg.start + 1]);
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_IND(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_IND(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 3)
         return std::nullopt;
@@ -795,7 +795,7 @@ std::optional<uint16_t> Assembler::resolve_arg_IND(const Argument_T& arg) {
     return value;
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_INDX(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_INDX(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 5)
         return std::nullopt;
@@ -825,7 +825,7 @@ std::optional<uint16_t> Assembler::resolve_arg_INDX(const Argument_T& arg) {
     return value;
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_INDY(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_INDY(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 5)
         return std::nullopt;
@@ -856,7 +856,7 @@ std::optional<uint16_t> Assembler::resolve_arg_INDY(const Argument_T& arg) {
     return value;
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_REL(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_REL(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 1)
         return std::nullopt;
@@ -864,7 +864,7 @@ std::optional<uint16_t> Assembler::resolve_arg_REL(const Argument_T& arg) {
     return resolve_value(tokens[arg.start]);
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_ZPG(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_ZPG(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 1)
         return std::nullopt;
@@ -872,7 +872,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ZPG(const Argument_T& arg) {
     return resolve_value(tokens[arg.start]);
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_ZPGX(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_ZPGX(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 3)
         return std::nullopt;
@@ -889,7 +889,7 @@ std::optional<uint16_t> Assembler::resolve_arg_ZPGX(const Argument_T& arg) {
     return value;
 }
 
-std::optional<uint16_t> Assembler::resolve_arg_ZPGY(const Argument_T& arg) {
+std::optional<uint16_t> Assembler::resolve_arg_ZPGY(const Argument_T& arg) const {
 
     if (arg.end - arg.start != 3)
         return std::nullopt;
