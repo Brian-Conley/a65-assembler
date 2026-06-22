@@ -4,10 +4,8 @@
 #include "include/token.hpp"
 #include "include/status_code.hpp"
 #include "include/hash.hpp"
-#include <cmath>
 #include <cstdint>
 #include <iostream>
-#include <memory>
 #include <optional>
 #include <string_view>
 
