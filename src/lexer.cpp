@@ -6,9 +6,9 @@
 #include <iostream>
 
 Lexer::Lexer(const std::string& path) :
-    tokenized(false),
-    tokens(),
     buffer(create_file_buffer(path)),
+    tokens(),
+    tokenized(false),
     idx(0)
 {}
 

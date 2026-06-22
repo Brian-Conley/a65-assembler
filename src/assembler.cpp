@@ -9,9 +9,11 @@
 #include <optional>
 #include <string_view>
 
-Assembler::Assembler(const std::vector<Token_T>& tokens,
-        const std::vector<Statement_T>& statements) :
-    tokens(tokens), statements(statements), assembled(false), reset_vector(0x0A00)
+Assembler::Assembler(const std::vector<Token_T>& tokens, const std::vector<Statement_T>& statements) :
+    tokens(tokens),
+    statements(statements),
+    assembled(false),
+    reset_vector(0x0A00)
 {}
 
 const std::vector<uint8_t>& Assembler::assemble() {
