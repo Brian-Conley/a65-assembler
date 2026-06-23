@@ -4,7 +4,7 @@
 Syntax examples for different value formats.
 
 | Value Type  | Format                     | Note             |
-| :---:       | :---:                      | :---:            |
+| :---:       | :---:                      | :---             |
 | Hexadecimal | $Ab12                      | Case insensitive.|
 | Binary      | %01000101                  |                  |
 | Decimal     | 1234                       |                  |
@@ -20,7 +20,7 @@ Syntax examples for different value formats.
 The behavior and argument format of every directive.
 
 | Directive | Syntax                 | Behavior                                                               |
-| :---:     | :---:                  | :--:                                                                   |
+| :---:     | :---:                  | :--                                                                    |
 | org       | .org $HHLL             | Set the VPC to the value.                                              |
 | res       | .res $HHLL             | Increment the VPC by the value.                                        |
 | byte      | .byte $LL,$LL,         | Insert listed bytes into memory, incrementing VPC proportionally.      |
@@ -36,7 +36,7 @@ The expected syntax and notes for each addressing mode. The hex value formats
  symbol name as defined in [Values](#Values).
 
 | MODE        | Syntax      | Note                   |
-| :---:       | :---:       | :---:                  |
+| :---:       | :---:       | :---                   |
 | **A**       | INS A       |                        |
 | **ABS**     | INS $HHLL   |                        |
 | **ABSX**    | INS $HHLL,X | X is case insensitive. |
