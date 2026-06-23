@@ -1,6 +1,5 @@
 build/
 tmp/
-docs/
 
 # Prerequisites
 *.d
