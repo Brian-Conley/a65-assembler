@@ -1,5 +1,7 @@
 build/
 tmp/
+docs/html/
+docs/latex/
 
 # Prerequisites
 *.d
