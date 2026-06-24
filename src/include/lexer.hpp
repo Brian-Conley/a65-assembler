@@ -21,6 +21,8 @@ class Lexer {
          */
         const std::vector<Token_T>& tokenize();
     private:
+        const std::string filename; /**< Name/path of the provided file. */
+
         /** @name Data Buffers */
         ///@{
         const std::string buffer;    /**< String buffer of the file. */
@@ -31,6 +33,7 @@ class Lexer {
         ///@{
         bool tokenized; /**< Flag to prevent duplicate work from multiple tokenize() calls. */
         size_t idx;     /**< Index pointer for the file buffer. */
+        size_t line;    /**< Track track the current line of the file. */
         ///@}
 
         /**

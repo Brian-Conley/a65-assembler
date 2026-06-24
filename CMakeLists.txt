@@ -18,6 +18,7 @@ target_sources(a65 PRIVATE
     ${SRC_DIR}/assembler.cpp
     ${SRC_DIR}/token.cpp
     ${SRC_DIR}/type_printers.cpp
+    ${SRC_DIR}/diagnostics.cpp
 )
 target_compile_options(a65 PRIVATE
     -Wall
