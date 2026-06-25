@@ -17,6 +17,14 @@ void Diagnostics::report(const Diagnostic& d) {
 
 bool Diagnostics::hasErrors() const { return errorCount > 0; }
 
+void Diagnostics::printTerminationMessage() const {
+    std::cerr << "\nTerminated with "
+              << "\033[33m" << warningCount << "\033[0m"
+              << (warningCount == 1 ? " warning" : " warnings")
+              << " and \033[31m" << errorCount << "\033[0m"
+              << (errorCount == 1 ? " error." : " errors.") << '\n';
+}
+
 size_t Diagnostics::getErrorCount() const { return errorCount; }
 
 size_t Diagnostics::getWarningCount() const { return warningCount; }
@@ -41,6 +49,7 @@ std::string Diagnostics::code_to_str(DiagnosticCode c) const {
         case DiagnosticCode::ParserUnexpectedToken: return "ParserUnexpectedToken";
         case DiagnosticCode::ParserOutOfBounds:     return "ParserOutOfBounds";
         case DiagnosticCode::AssemblerError:        return "AssemblerError";
+        case DiagnosticCode::AssemblyFailed:        return "AssemblyFailed";
         default:                                    return "UnknownError";
     };
 }
@@ -58,10 +67,7 @@ void Diagnostics::error(const Diagnostic& d) {
 void Diagnostics::fatal(const Diagnostic& d) {
     printDiagnostic(d, "\033[31m", "F");
     ++errorCount;
-
-    std::cerr << "\nTerminated with \033[33m"
-              << warningCount << "\033[0m warnings "
-              << "and \033[31m" << errorCount << "\033[0m errors.\n";
+    printTerminationMessage();
     exit(static_cast<int>(d.code));
 }
 

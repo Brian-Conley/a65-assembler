@@ -12,21 +12,35 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::string path(argv[1]);
+    std::string outFileName = "out.bin";
 
     Lexer lex(path);
-    Parser par(lex.tokenize());
+    Parser par(lex.tokenize(), path);
     Assembler ass(lex.tokenize(), par.parse());
     const auto code = ass.assemble();
 
-    std::ofstream outfile("out.bin", std::ios::out | std::ios::binary);
+    if (Diagnostics::get().hasErrors()) {
+        Diagnostics::get().printTerminationMessage();
+        exit(static_cast<int>(DiagnosticCode::AssemblyFailed));
+    }
+
+    std::ofstream outfile(outFileName, std::ios::out | std::ios::binary);
     if (!outfile) {
-        std::cerr << "Error: Could not open file \"out.bin\".\n";
-        return 1;
+        Diagnostics::get().report({
+                DiagnosticSeverity::Fatal,
+                DiagnosticCode::FileSystemError,
+                {path, 0},
+                "Failed to open file \"" + outFileName + "\"."
+                });
     }
     outfile.write(reinterpret_cast<const char*>(code.data()), code.size());
     if (!outfile) {
-        std::cerr << "Error: Failed to write to \"out.bin\".\n";
-        return 1;
+        Diagnostics::get().report({
+                DiagnosticSeverity::Fatal,
+                DiagnosticCode::FileSystemError,
+                {path, 0},
+                "Failed to write to file \"" + outFileName + "\"."
+                });
     }
 
     return 0;

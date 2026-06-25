@@ -21,7 +21,9 @@ enum class DiagnosticCode {
     ParserUnknownToken,
     ParserUnexpectedToken,
     ParserOutOfBounds,
-    AssemblerError
+
+    AssemblerError,
+    AssemblyFailed
 };
 
 struct SourceLocation {
@@ -43,6 +45,8 @@ public:
     void report(const Diagnostic& d);
 
     bool hasErrors() const;
+
+    void printTerminationMessage() const;
 
     size_t getErrorCount() const;
 
