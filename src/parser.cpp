@@ -1,10 +1,8 @@
 #include "include/parser.hpp"
 #include "include/token.hpp"
 #include "include/type_printers.hpp"
-#include "include/status_code.hpp"
 #include "include/diagnostics.hpp"
 #include <cstdlib>
-#include <iostream>
 
 Parser::Parser(const std::vector<Token_T>& tokens, const std::string& filename):
     filename(filename),
