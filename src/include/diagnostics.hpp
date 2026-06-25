@@ -18,6 +18,9 @@ enum class DiagnosticCode {
     LexerUnknownSymbol,
 
     ParserError,
+    ParserUnknownToken,
+    ParserUnexpectedToken,
+    ParserOutOfBounds,
     AssemblerError
 };
 

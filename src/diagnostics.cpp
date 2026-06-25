@@ -37,6 +37,9 @@ std::string Diagnostics::code_to_str(DiagnosticCode c) const {
         case DiagnosticCode::LexerUnknownChar:      return "LexerUnknownChar";
         case DiagnosticCode::LexerUnknownSymbol:    return "LexerUnknownSymbol";
         case DiagnosticCode::ParserError:           return "ParserError";
+        case DiagnosticCode::ParserUnknownToken:    return "ParserUnknownToken";
+        case DiagnosticCode::ParserUnexpectedToken: return "ParserUnexpectedToken";
+        case DiagnosticCode::ParserOutOfBounds:     return "ParserOutOfBounds";
         case DiagnosticCode::AssemblerError:        return "AssemblerError";
         default:                                    return "UnknownError";
     };
