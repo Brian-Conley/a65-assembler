@@ -15,7 +15,7 @@ void Diagnostics::report(const Diagnostic& d) {
     };
 }
 
-bool Diagnostics::hasErrors() const { return (warningCount > 0) || (errorCount > 0); }
+bool Diagnostics::hasErrors() const { return errorCount > 0; }
 
 size_t Diagnostics::getErrorCount() const { return errorCount; }
 
