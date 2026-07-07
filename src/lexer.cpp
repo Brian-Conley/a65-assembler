@@ -1,15 +1,16 @@
 #include "include/lexer.hpp"
 #include "include/lexer_specification.hpp"
 #include "include/createBuffer.hpp"
-#include "include/status_code.hpp"
 #include "include/token.hpp"
-#include <iostream>
+#include "include/diagnostics.hpp"
 
 Lexer::Lexer(const std::string& path) :
+    filename(path),
     buffer(create_file_buffer(path)),
     tokens(),
     tokenized(false),
-    idx(0)
+    idx(0),
+    line(1)
 {}
 
 const std::vector<Token_T>& Lexer::tokenize() {
@@ -41,9 +42,13 @@ const std::vector<Token_T>& Lexer::tokenize() {
         } else if (NEWLINE.find_first_of(c) != NEWLINE.npos) {
             this->tokens.push_back(this->parse_newline());
         } else {
-            // TODO Improve error handling
-            std::cerr << "Unknown char: " << c << '\n';
-            exit(static_cast<int>(STATUS_CODE::LEXER_ERROR));
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Warning,
+                    DiagnosticCode::LexerUnknownChar,
+                    {filename, line},
+                    (std::string("Unknown character: \"") + c + std::string("\". Skipping"))
+            });
+            advance(1);
         }
     }
 
@@ -127,12 +132,15 @@ Token_T Lexer::parse_symbol() {
             end = this->buffer.find_first_of('\"', start+1);
             break;
 
-        // TODO Improve error handling
-        /*
         case TOKEN_TYPE::UNKNOWN:
-            throw std::runtime_error("Unexpected symbol: " + std::string(1, symbol));
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Warning,
+                    DiagnosticCode::LexerUnknownSymbol,
+                    {filename, line},
+                    (std::string("Unknown symbol: \"") + symbol + std::string("\"."))
+            });
+            token.type = type;
             break;
-        */
 
         default:
             token.type = type;
@@ -160,6 +168,7 @@ Token_T Lexer::parse_newline() {
     const size_t len = end - start;
     token.value = std::string_view(this->buffer.data() + start, len);
 
+    ++line;
     this->advance(len);
     return token;
 }

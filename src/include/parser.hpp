@@ -12,7 +12,7 @@ class Parser {
          *
          * @param tokens The vector of tokens produced by the Lexer.
          */
-        Parser(const std::vector<Token_T>& tokens);
+        Parser(const std::vector<Token_T>& tokens, const std::string& filename);
 
         /**
          * @brief Parse the token vector into statements.
@@ -22,6 +22,8 @@ class Parser {
         const std::vector<Statement_T>& parse();
 
     private:
+        const std::string filename; /**< File name/path of the token buffer */
+
         /** @name Data Buffers */
         ///@{
         const std::vector<Token_T>& tokens;  /**< Token vector passed to the constructor. */

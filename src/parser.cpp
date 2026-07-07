@@ -1,11 +1,11 @@
 #include "include/parser.hpp"
 #include "include/token.hpp"
 #include "include/type_printers.hpp"
-#include "include/status_code.hpp"
+#include "include/diagnostics.hpp"
 #include <cstdlib>
-#include <iostream>
 
-Parser::Parser(const std::vector<Token_T>& tokens):
+Parser::Parser(const std::vector<Token_T>& tokens, const std::string& filename):
+    filename(filename),
     tokens(tokens),
     statements(),
     parsed(false),
@@ -44,24 +44,26 @@ const std::vector<Statement_T>& Parser::parse() {
                 continue;
                 break;
 
-            // Exit if the token is unknown
-            // TODO Improve error handling
             case TOKEN_TYPE::UNKNOWN:
-                std::cerr << "Unknown token:\n"
-                    << "\t   idx: " << this->idx << '\n'
-                    << "\t token: " << token_to_str(this->tokens[this->idx]) << '\n';
-                exit(static_cast<int>(STATUS_CODE::PARSER_ERROR));
+                Diagnostics::get().report({
+                        DiagnosticSeverity::Error,
+                        DiagnosticCode::ParserUnknownToken,
+                        {filename, line},
+                        (std::string("Unknown token: \"") + token_to_str(tokens[idx]) + "\"")
+                        });
                 break;
 
             case TOKEN_TYPE::END:
                 this->parsed = true;
                 break;
             default:
-                // TODO Improve error handling
-                std::cerr << "Unexpected token:\n"
-                    << "\t  idx: " << this->idx << '\n'
-                    << "\ttoken: " << token_to_str(this->tokens[this->idx]) << '\n';
-                exit(static_cast<int>(STATUS_CODE::PARSER_ERROR));
+                Diagnostics::get().report({
+                        DiagnosticSeverity::Error,
+                        DiagnosticCode::ParserUnexpectedToken,
+                        {filename, line},
+                        (std::string("Unexpected token: \"") + token_to_str(tokens[idx]) + "\"")
+                        });
+                break;
         }
     }
 
@@ -69,13 +71,13 @@ const std::vector<Statement_T>& Parser::parse() {
 }
 
 TOKEN_TYPE Parser::get_token_type(size_t idx) const {
-    // TODO Improve error handling
     if (idx >= this->tokens.size()) {
-        std::cerr << "Parser::get_token_type() out of bounds\n"
-            << "\t              idx: " << idx << '\n'
-            << "\ttoken vector size: " << this->tokens.size() << '\n';
-
-        exit(static_cast<int>(STATUS_CODE::PARSER_ERROR));
+        Diagnostics::get().report({
+                DiagnosticSeverity::Fatal,
+                DiagnosticCode::ParserOutOfBounds,
+                {filename, line},
+                "Parser::get_token_type() out of bounds."
+                });
     }
     return this->tokens[idx].type;
 }
@@ -148,12 +150,13 @@ Statement_T Parser::parse_statement() {
             statement.type = STATEMENT_TYPE::DIRECTIVE;
             ++this->idx;
 
-            // TODO Improve error handling
             if (get_token_type(this->idx) != TOKEN_TYPE::IDENTIFIER) {
-                std::cerr << "Unexpected token:\n"
-                    << "\t  idx: " << this->idx << '\n'
-                    << "\ttoken: " << token_to_str(this->tokens[this->idx]);
-                exit(static_cast<int>(STATUS_CODE::PARSER_ERROR));
+                Diagnostics::get().report({
+                        DiagnosticSeverity::Error,
+                        DiagnosticCode::ParserUnexpectedToken,
+                        {filename, line},
+                        (std::string("Unexpected token: \"") + token_to_str(tokens[idx]) + "\"")
+                        });
             }
 
             statement.mnemonic = this->idx;
@@ -178,11 +181,12 @@ Statement_T Parser::parse_statement() {
             break;
 
         default:
-            // TODO Improve error handling
-            std::cerr << "Unexpected token:\n"
-                << "\t  idx: " << this->idx << '\n'
-                << "\ttoken: " << token_to_str(this->tokens[this->idx]);
-            exit(static_cast<int>(STATUS_CODE::PARSER_ERROR));
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::ParserUnexpectedToken,
+                    {filename, line},
+                    (std::string("Unexpected token: \"") + token_to_str(tokens[idx]) + "\"")
+                    });
             break;
     }
 
@@ -198,11 +202,13 @@ Argument_T Parser::parse_argument() {
             break;
         }
 
-        // TODO Improve error handling
         if (this->idx >= this->tokens.size()) {
-            std::cerr << "Parser::parse_argument():\n"
-                << "\tidx exceeded the bounds of the token vector.\n";
-            exit(static_cast<int>(STATUS_CODE::PARSER_ERROR));
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Fatal,
+                    DiagnosticCode::ParserOutOfBounds,
+                    {filename, line},
+                    "Parser::parse_argument() out of bounds."
+                    });
         }
     }
     arg.end = this->idx;

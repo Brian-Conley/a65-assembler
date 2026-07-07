@@ -19,7 +19,8 @@ class Assembler {
          * @param statements The vector of statements produced by the Parser.
          */
         Assembler(const std::vector<Token_T>& tokens,
-                const std::vector<Statement_T>& statements);
+                const std::vector<Statement_T>& statements,
+                const std::string& filename);
 
         /**
          * @brief Turn the statements into machine code.
@@ -30,6 +31,7 @@ class Assembler {
 
     private:
         Assembler() = delete;
+        const std::string filename;
 
         /** @name Data Buffers */
         ///@{
@@ -42,6 +44,7 @@ class Assembler {
         ///@{
         std::unordered_map<std::string_view, uint16_t> symbol_table; /**< Pairs string values to 16-bit addresses. */
         bool assembled;                                              /**< Flag to prevent duplicate work from multiple assemble() calls. */
+        bool is_pass_1;                                              /**< Flag to prevent duplicate errors on multiple passes. */
         const uint16_t reset_vector;                                 /**< The expected starting address of the program. */
         ///@}
 
@@ -55,7 +58,7 @@ class Assembler {
         /**
          * @brief Derive the addressing mode from the instruction and its argument.
          */
-        ADDRESSING_MODE determine_addressing_mode(INSTRUCTION_TYPE ins, const std::optional<Argument_T>& arg) const;
+        std::optional<ADDRESSING_MODE> determine_addressing_mode(INSTRUCTION_TYPE ins, const Statement_T& s) const;
 
         /**
          * @brief Determine how many bytes an instruction will take based on the addressing mode.

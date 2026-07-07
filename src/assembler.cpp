@@ -2,17 +2,19 @@
 #include "include/opcodes.hpp"
 #include "include/statement.hpp"
 #include "include/token.hpp"
-#include "include/status_code.hpp"
 #include "include/hash.hpp"
+#include "include/diagnostics.hpp"
 #include <cstdint>
-#include <iostream>
 #include <optional>
+#include <string>
 #include <string_view>
 
-Assembler::Assembler(const std::vector<Token_T>& tokens, const std::vector<Statement_T>& statements) :
+Assembler::Assembler(const std::vector<Token_T>& tokens, const std::vector<Statement_T>& statements, const std::string& filename) :
+    filename(filename),
     tokens(tokens),
     statements(statements),
     assembled(false),
+    is_pass_1(true),
     reset_vector(0x0A00)
 {}
 
@@ -41,21 +43,39 @@ const std::vector<uint8_t>& Assembler::assemble() {
         /* INSTRUCTION TYPE */
 
         if (!s.mnemonic.has_value()) {
-            std::cerr << "Error on line " << s.line << ": No instruction mnemonic found.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerNoMnemonic,
+                    {filename, s.line},
+                    "No instruction mnemonic found."
+                    });
         }
 
         std::optional<INSTRUCTION_TYPE> ins_type = determine_instruction_type(tokens[s.mnemonic.value()]);
         if (!ins_type.has_value()) {
-            std::cerr << "Error on line " << s.line << ": Unknown instruction mnemonic "
-                      << "\"" << token_val(s.mnemonic.value()) << "\".\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerUnknownInstruction,
+                    {filename, s.line},
+                    (std::string("Unknown instruction mnemonic: \"" + std::string(token_val(s.mnemonic.value())) + "\"."))
+                    });
+            continue;
         }
 
-        ADDRESSING_MODE addr_mode = determine_addressing_mode(ins_type.value(), s.argument);
-        pc += get_mode_size(addr_mode);
+        auto addr_mode = determine_addressing_mode(ins_type.value(), s);
+        if (!addr_mode.has_value()) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerUnresolvedAddressMode,
+                    {filename, s.line},
+                    "Failed to resolve address mode."
+                    });
+            continue;
+        }
+        pc += get_mode_size(addr_mode.value());
 
     }
+    is_pass_1 = false;
 
     // Pass 2 through n-1: Iterate until the symbol table stabilizes.
     bool label_changed = true;
@@ -85,13 +105,16 @@ const std::vector<uint8_t>& Assembler::assemble() {
 
             std::optional<INSTRUCTION_TYPE> ins_type = determine_instruction_type(tokens[s.mnemonic.value()]);
             if (!ins_type.has_value()) {
-                std::cerr << "Error on line " << s.line << ": Unknown instruction mnemonic "
-                    << "\"" << token_val(s.mnemonic.value()) << "\".\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+                // Error already reported in pass 1
+                continue;
             }
 
-            ADDRESSING_MODE addr_mode = determine_addressing_mode(ins_type.value(), s.argument);
-            pc += get_mode_size(addr_mode);
+            auto addr_mode = determine_addressing_mode(ins_type.value(), s);
+            if (!addr_mode.has_value()) {
+                // Error already reported in pass 1
+                continue;
+            }
+            pc += get_mode_size(addr_mode.value());
 
         }
 
@@ -116,17 +139,25 @@ const std::vector<uint8_t>& Assembler::assemble() {
 
         std::optional<INSTRUCTION_TYPE> ins_type_opt = determine_instruction_type(tokens[s.mnemonic.value()]);
         if (!ins_type_opt.has_value()) {
-            std::cerr << "Error on line " << s.line << ": Unknown instruction mnemonic "
-                      << "\"" << token_val(s.mnemonic.value()) << "\".\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            // Error already reported in pass 1
+            continue;
         }
 
         INSTRUCTION_TYPE ins_type = ins_type_opt.value();
-        ADDRESSING_MODE addr_mode = determine_addressing_mode(ins_type, s.argument);
+        auto addr_mode_opt = determine_addressing_mode(ins_type, s);
+        if (!addr_mode_opt.has_value()) {
+            // Error already reported in pass 1
+            continue;
+        }
+        auto addr_mode = addr_mode_opt.value();
 
         if (opcode_lookup[ins_type][addr_mode] == BAD_OPC) {
-            std::cerr << "Error on line " << s.line << ": Addressing mode not supported by instruction\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerBadAddressMode,
+                    {filename, s.line},
+                    "Addressing mode not supported by instruction."
+                    });
         }
 
         if (addr_mode == ADD_A || addr_mode == ADD_IMPLIED) {
@@ -136,8 +167,12 @@ const std::vector<uint8_t>& Assembler::assemble() {
 
         std::optional<uint16_t> arg_val_opt = resolve_ins_arg(s.argument.value(), addr_mode);
         if (!arg_val_opt.has_value()) {
-            std::cerr << "Error on line " << s.line << ": Failed to resolve instruction argument.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerUnresolvedArg,
+                    {filename, s.line},
+                    "Failed to resolve instruction argument."
+                    });
         }
         uint16_t arg_val = arg_val_opt.value();
         size_t ins_size = get_mode_size(addr_mode);
@@ -145,8 +180,12 @@ const std::vector<uint8_t>& Assembler::assemble() {
         if (addr_mode == ADD_REL) {
             int difference = arg_val - (pc + 2);
             if (difference < -128 || difference > 127) {
-                std::cerr << "Error on line " << s.line << ": Jump distance is too great.\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+                Diagnostics::get().report({
+                        DiagnosticSeverity::Error,
+                        DiagnosticCode::AssemblerJumpTooLarge,
+                        {filename, s.line},
+                        "Branch offset too great: " + std::to_string(difference) + " (must be within -128/+127)."
+                        });
             }
             uint8_t jump = static_cast<uint8_t>(difference);
 
@@ -286,7 +325,9 @@ std::optional<INSTRUCTION_TYPE> Assembler::determine_instruction_type(const Toke
     };
 }
 
-ADDRESSING_MODE Assembler::determine_addressing_mode(INSTRUCTION_TYPE ins, const std::optional<Argument_T>& arg) const {
+std::optional<ADDRESSING_MODE> Assembler::determine_addressing_mode(INSTRUCTION_TYPE ins, const Statement_T& s) const {
+
+    auto arg = s.argument;
 
     // Check for Implied
     if (!arg.has_value()) {
@@ -300,13 +341,6 @@ ADDRESSING_MODE Assembler::determine_addressing_mode(INSTRUCTION_TYPE ins, const
 
     // Check if the operand will be one byte using a '<' or '>' operator
     bool prefer_zpg = false;
-    /*
-    if (first_token_val == "<" || first_token_val == ">") {
-        prefer_zpg = true;
-        start++;
-        first_token_val = token_val(start);
-    }
-    */
 
     // Check for Accumulator mode
     if (first_token_val == "A" || first_token_val == "a")
@@ -346,10 +380,9 @@ ADDRESSING_MODE Assembler::determine_addressing_mode(INSTRUCTION_TYPE ins, const
             break;
         }
 
-        // TODO Improve error handling
         if (i >= end) {
-            std::cerr << "Could not find argument operand\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            // Reached end of argument without finding a suitable token
+            return std::nullopt;
         }
     }
 
@@ -371,17 +404,12 @@ ADDRESSING_MODE Assembler::determine_addressing_mode(INSTRUCTION_TYPE ins, const
         }
 
         default:
-            // TODO Improve error handling
-            std::cerr << "Invalid token type in operand\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
-            break;
+            return std::nullopt;
 
     };
 
-    // TODO Improve error handling
     if (!value.has_value()) {
-        std::cerr << "Failed to resolve operand value\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        return std::nullopt;
     }
 
     // Distinguish between ABS and ZPG and return.
@@ -434,8 +462,7 @@ std::optional<uint16_t> Assembler::resolve_numeric_token_value(const Token_T& t)
             base = 2;
             break;
         default:
-            std::cerr << "Invalid token type\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            return std::nullopt;
     };
 
     size_t value = 0;
@@ -504,9 +531,13 @@ bool Assembler::handle_label(const Statement_T& s, uint16_t pc, bool error_on_re
         auto [it, inserted] = symbol_table.insert({token_val(s.label.value()), pc});
         if (!inserted) {
             if (error_on_redefinition) {
-                std::cerr << "Error on line " << s.line << ": Symbol \""
-                          << token_val(s.label.value()) << "\" is already defined.\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+                Diagnostics::get().report({
+                        DiagnosticSeverity::Error,
+                        DiagnosticCode::AssemblerSymbolRedefinition,
+                        {filename, s.line},
+                        ("Symbol \"" + std::string(token_val(s.label.value())) + "\" is already defined.")
+                        });
+                return false;
             }
             if (it->second == pc) {
                 return false;
@@ -524,8 +555,15 @@ void Assembler::handle_directive(const Statement_T& s, uint16_t& pc) {
         return;
 
     if (!s.mnemonic.has_value()) {
-        std::cerr << "Error on line " << s.line << ": Directive has no mnemonic.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerNoMnemonic,
+                    {filename, s.line},
+                    "Directive is missing a mnemonic."
+                    });
+        }
+        return;
     }
 
     switch(hash_djb2(token_val(s.mnemonic.value()))) {
@@ -539,28 +577,55 @@ void Assembler::handle_directive(const Statement_T& s, uint16_t& pc) {
         case "align"_hash: dir_align(s, pc); break;
 
         default:
-            std::cerr << "Error on line " << s.line << ": Unknown directive.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            if (is_pass_1) {
+                Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerUnknownDirective,
+                    {filename, s.line},
+                    ("Unknown directive: \"" + std::string(token_val(s.mnemonic.value())) + "\".")
+                    });
+            }
     };
 }
 
 void Assembler::dir_org(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .org missing an argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".org directive is missing an argument."
+                    });
+        }
+        return;
     }
 
     const Argument_T& arg = s.argument.value();
     if (arg.end - arg.start != 1) {
-        std::cerr << "Error on line " << s.line << ": .org expects exactly one argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".org expects exactly one argument."
+                    });
+        }
+        return;
     }
 
     std::optional<uint16_t> value = resolve_value(tokens[arg.start]);
     if (!value.has_value()) {
-        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Failed to resolve argument value."
+                    });
+        }
+        return;
     }
     pc = value.value();
     return;
@@ -569,20 +634,41 @@ void Assembler::dir_org(const Statement_T& s, uint16_t& pc) {
 void Assembler::dir_res(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .res missing an argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".res directive is missing an argument."
+                    });
+        }
+        return;
     }
 
     const Argument_T& arg = s.argument.value();
     if (arg.end - arg.start != 1) {
-        std::cerr << "Error on line " << s.line << ": .res expects exactly one argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".res expects exactly one argument."
+                    });
+        }
+        return;
     }
 
     std::optional<uint16_t> value = resolve_value(tokens[arg.start]);
     if (!value.has_value()) {
-        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Failed to resolve argument value."
+                    });
+        }
+        return;
     }
     pc += value.value();
     return;
@@ -591,8 +677,15 @@ void Assembler::dir_res(const Statement_T& s, uint16_t& pc) {
 void Assembler::dir_byte(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .byte missing an argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".byte is missing an argument."
+                    });
+        }
+        return;
     }
 
     const Argument_T& arg = s.argument.value();
@@ -602,13 +695,27 @@ void Assembler::dir_byte(const Statement_T& s, uint16_t& pc) {
             TOKEN_TYPE tt = tokens[i].type;
             if (tt != TOKEN_TYPE::NUMBER_HEX && tt != TOKEN_TYPE::NUMBER_BIN
                     && tt != TOKEN_TYPE::NUMBER_DEC && tt != TOKEN_TYPE::IDENTIFIER) {
-                std::cerr << "Error on line " << s.line << ": .byte expected a numeric value or label.\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+                if (is_pass_1) {
+                    Diagnostics::get().report({
+                            DiagnosticSeverity::Error,
+                            DiagnosticCode::AssemblerDirectiveError,
+                            {filename, s.line},
+                            ".byte expects a numeric value or label."
+                            });
+                }
+                return;
             }
             auto value = resolve_value(tokens[i]);
             if (!value.has_value()) {
-                std::cerr << "Error on line " << s.line << ": Failed to resolve value.\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+                if (is_pass_1) {
+                    Diagnostics::get().report({
+                            DiagnosticSeverity::Error,
+                            DiagnosticCode::AssemblerDirectiveError,
+                            {filename, s.line},
+                            "Failed to resolve value."
+                            });
+                }
+                return;
             }
             emit_byte(value.value() & 0xFF, pc);
             expects_num = false;
@@ -616,8 +723,15 @@ void Assembler::dir_byte(const Statement_T& s, uint16_t& pc) {
         }
 
         if (tokens[i].type != TOKEN_TYPE::COMMA) {
-            std::cerr << "Error on line " << s.line << ": .byte expected a comma.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            if (is_pass_1) {
+                Diagnostics::get().report({
+                        DiagnosticSeverity::Error,
+                        DiagnosticCode::AssemblerDirectiveError,
+                        {filename, s.line},
+                        ".byte expects a comma between values."
+                        });
+            }
+            return;
         }
         expects_num = true;
     }
@@ -627,8 +741,15 @@ void Assembler::dir_byte(const Statement_T& s, uint16_t& pc) {
 void Assembler::dir_word(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .word missing an argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".word is missing an argument."
+                    });
+        }
+        return;
     }
 
     const Argument_T& arg = s.argument.value();
@@ -638,13 +759,27 @@ void Assembler::dir_word(const Statement_T& s, uint16_t& pc) {
             TOKEN_TYPE tt = tokens[i].type;
             if (tt != TOKEN_TYPE::NUMBER_HEX && tt != TOKEN_TYPE::NUMBER_BIN
                     && tt != TOKEN_TYPE::NUMBER_DEC && tt != TOKEN_TYPE::IDENTIFIER) {
-                std::cerr << "Error on line " << s.line << ": .word expected a numeric value or label.\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+                if (is_pass_1) {
+                    Diagnostics::get().report({
+                            DiagnosticSeverity::Error,
+                            DiagnosticCode::AssemblerDirectiveError,
+                            {filename, s.line},
+                            ".word expects a numeric value or label."
+                            });
+                }
+                return;
             }
             auto value = resolve_value(tokens[i]);
             if (!value.has_value()) {
-                std::cerr << "Error on line " << s.line << ": Failed to resolve value.\n";
-                exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+                if (is_pass_1) {
+                    Diagnostics::get().report({
+                            DiagnosticSeverity::Error,
+                            DiagnosticCode::AssemblerDirectiveError,
+                            {filename, s.line},
+                            "Failed to resolve value."
+                            });
+                }
+                return;
             }
             emit_byte(value.value() & 0xFF, pc);
             emit_byte((value.value() >> 8) & 0xFF, pc);
@@ -653,8 +788,15 @@ void Assembler::dir_word(const Statement_T& s, uint16_t& pc) {
         }
 
         if (tokens[i].type != TOKEN_TYPE::COMMA) {
-            std::cerr << "Error on line " << s.line << ": .word expected a comma.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            if (is_pass_1) {
+                Diagnostics::get().report({
+                        DiagnosticSeverity::Error,
+                        DiagnosticCode::AssemblerDirectiveError,
+                        {filename, s.line},
+                        ".word expects a comma between values."
+                        });
+            }
+            return;
         }
         expects_num = true;
     }
@@ -664,76 +806,151 @@ void Assembler::dir_word(const Statement_T& s, uint16_t& pc) {
 void Assembler::dir_equ(const Statement_T& s) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .equ missing an argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".equ is missing an argument."
+                    });
+        }
+        return;
     }
 
     const Argument_T& arg = s.argument.value();
     if (arg.end - arg.start != 2) {
-        std::cerr << "Error on line " << s.line << ": .equ expects exactly two arguments.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".equ expects exactly two arguments."
+                    });
+        }
+        return;
     }
 
     if (tokens[arg.start].type != TOKEN_TYPE::IDENTIFIER) {
-        std::cerr << "Error on line " << s.line << ": .equ expects first argument to be an identifier.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".equ expects the first argument to be an identifier."
+                    });
+        }
+        return;
     }
 
     const std::string_view& symbol = token_val(arg.start);
     auto value = resolve_value(tokens[arg.start + 1]);
     if (!value.has_value()) {
-        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Failed to resolve argument value."
+                    });
+        }
+        return;
     }
 
     auto symbol_loc = symbol_table.find(symbol);
     if (symbol_loc != symbol_table.end()) {
         if (value.value() != symbol_loc->second) {
-            std::cerr << "Error on line " << s.line << ": Symbol \""
-                      << token_val(arg.start) << "\" is already defined.\n";
-            exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+            if (is_pass_1) {
+                Diagnostics::get().report({
+                        DiagnosticSeverity::Error,
+                        DiagnosticCode::AssemblerDirectiveError,
+                        {filename, s.line},
+                        "Symbol \"" + std::string(token_val(arg.start)) + "\" is already defined."
+                        });
+            }
         }
         return;
     }
 
     bool inserted = symbol_table.insert({symbol, value.value()}).second;
     if (!inserted) {
-        std::cerr << "Error on line " << s.line << ": Failed to assign value to symbol.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Failed to assign value to symbol."
+                    });
+        }
+        return;
     }
 }
 
 void Assembler::dir_fill(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .fill missing an argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".fill is missing an argument."
+                    });
+        }
+        return;
     }
     auto arg = s.argument.value();
 
     if (arg.end - arg.start != 3) {
-        std::cerr << "Error on line " << s.line << ": Failed to resolve argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Failed to resolve argument."
+                    });
+        }
+        return;
     }
 
     size_t idx = arg.start;
     auto range = resolve_value(tokens[idx]);
     if (!range.has_value()) {
-        std::cerr << "Error on line " << s.line << ": Failed to resolve first parameter value.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Failed to resolve first parameter value."
+                    });
+        }
+        return;
     }
     ++idx;
 
     if (tokens[idx].type != TOKEN_TYPE::COMMA) {
-        std::cerr << "Error on line " << s.line << ": Expected a comma between parameters.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Expected a comma between parameter values."
+                    });
+        }
+        return;
     }
     ++idx;
 
     auto value = resolve_value(tokens[idx]);
     if (!value.has_value()) {
-        std::cerr << "Error on line " << s.line << ": Failed to resolve second parameter value.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Failed to resolve second parameter value."
+                    });
+        }
+        return;
     }
 
     for (uint16_t i = 0; i < range.value(); ++i) {
@@ -744,15 +961,29 @@ void Assembler::dir_fill(const Statement_T& s, uint16_t& pc) {
 void Assembler::dir_ascii(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .ascii missing an argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".ascii is missing an argument."
+                    });
+        }
+        return;
     }
     auto arg = s.argument.value();
 
     size_t idx = arg.start;
     if (tokens[idx].type != TOKEN_TYPE::STRING_LITERAL) {
-        std::cerr << "Error on line " << s.line << ": .ascii expects a string literal.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".ascii expects a string literal."
+                    });
+        }
+        return;
     }
 
     for (auto c : tokens[idx].value) {
@@ -766,26 +997,54 @@ void Assembler::dir_ascii(const Statement_T& s, uint16_t& pc) {
 void Assembler::dir_align(const Statement_T& s, uint16_t& pc) {
 
     if (!s.argument.has_value()) {
-        std::cerr << "Error on line " << s.line << ": .align missing an argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".align is missing an argument."
+                    });
+        }
+        return;
     }
     auto arg = s.argument.value();
 
     if (arg.end - arg.start != 1) {
-        std::cerr << "Error on line " << s.line << ": .align expects exactly one argument.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    ".align expects exactly one argument."
+                    });
+        }
+        return;
     }
 
     auto value = resolve_value(tokens[arg.start]);
     if (!value.has_value()) {
-        std::cerr << "Error on line " << s.line << ": Failed to resolve argument value.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Failed to resolve argument value."
+                    });
+        }
+        return;
     }
 
     uint16_t alignment = value.value();
     if (alignment == 0 || (alignment & (alignment - 1)) != 0) {
-        std::cerr << "Error on line " << s.line << ": Argument must be a power of 2.\n";
-        exit(static_cast<int>(STATUS_CODE::ASSEMBLER_ERROR));
+        if (is_pass_1) {
+            Diagnostics::get().report({
+                    DiagnosticSeverity::Error,
+                    DiagnosticCode::AssemblerDirectiveError,
+                    {filename, s.line},
+                    "Argument must be a power of 2."
+                    });
+        }
+        return;
     }
 
     uint16_t remainder = pc % alignment;
