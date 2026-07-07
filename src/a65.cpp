@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
 
     Lexer lex(path);
     Parser par(lex.tokenize(), path);
-    Assembler ass(lex.tokenize(), par.parse());
+    Assembler ass(lex.tokenize(), par.parse(), path);
     const auto code = ass.assemble();
 
     if (Diagnostics::get().hasErrors()) {

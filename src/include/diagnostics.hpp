@@ -23,6 +23,15 @@ enum class DiagnosticCode {
     ParserOutOfBounds,
 
     AssemblerError,
+    AssemblerNoMnemonic,
+    AssemblerUnknownInstruction,
+    AssemblerUnknownDirective,
+    AssemblerBadAddressMode,
+    AssemblerUnresolvedArg,
+    AssemblerJumpTooLarge,
+    AssemblerUnresolvedAddressMode,
+    AssemblerSymbolRedefinition,
+    AssemblerDirectiveError,
     AssemblyFailed
 };
 

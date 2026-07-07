@@ -49,6 +49,15 @@ std::string Diagnostics::code_to_str(DiagnosticCode c) const {
         case DiagnosticCode::ParserUnexpectedToken: return "ParserUnexpectedToken";
         case DiagnosticCode::ParserOutOfBounds:     return "ParserOutOfBounds";
         case DiagnosticCode::AssemblerError:        return "AssemblerError";
+        case DiagnosticCode::AssemblerNoMnemonic:   return "AssemblerNoMnemonic";
+        case DiagnosticCode::AssemblerUnknownInstruction: return "AssemblerUnknownInstruction";
+        case DiagnosticCode::AssemblerUnknownDirective:   return "AssemblerUnknownDirective";
+        case DiagnosticCode::AssemblerBadAddressMode:     return "AssemblerBadAddressMode";
+        case DiagnosticCode::AssemblerUnresolvedArg:      return "AssemblerUnresolvedArg";
+        case DiagnosticCode::AssemblerJumpTooLarge: return "AssemblerJumpTooLarge";
+        case DiagnosticCode::AssemblerUnresolvedAddressMode: return "AssemblerUnresolvedAddressMode";
+        case DiagnosticCode::AssemblerSymbolRedefinition: return "AssemblerSymbolRedefinition";
+        case DiagnosticCode::AssemblerDirectiveError:     return "AssemblerDirectiveError";
         case DiagnosticCode::AssemblyFailed:        return "AssemblyFailed";
         default:                                    return "UnknownError";
     };
