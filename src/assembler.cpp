@@ -9,13 +9,16 @@
 #include <string>
 #include <string_view>
 
-Assembler::Assembler(const std::vector<Token_T>& tokens, const std::vector<Statement_T>& statements, const std::string& filename) :
+Assembler::Assembler(const std::vector<Token_T>& tokens,
+        const std::vector<Statement_T>& statements,
+        const std::string& filename) :
     filename(filename),
     tokens(tokens),
     statements(statements),
     assembled(false),
     is_pass_1(true),
-    reset_vector(0x0A00)
+    reset_vector(0x0000),
+    reset_vector_initialized(false)
 {}
 
 const std::vector<uint8_t>& Assembler::assemble() {
@@ -76,6 +79,8 @@ const std::vector<uint8_t>& Assembler::assemble() {
 
     }
     is_pass_1 = false;
+    machine_code.clear();
+    reset_vector_initialized = false;
 
     // Pass 2 through n-1: Iterate until the symbol table stabilizes.
     bool label_changed = true;
@@ -119,9 +124,11 @@ const std::vector<uint8_t>& Assembler::assemble() {
         }
 
         machine_code.clear();
+        reset_vector_initialized = false;
         ++iterations;
     }
-
+    machine_code.clear();
+    reset_vector_initialized = false;
 
     // Pass n: Generate the machine code
     pc = reset_vector;
@@ -512,6 +519,11 @@ std::optional<uint16_t> Assembler::resolve_value(const Token_T& t) const {
 }
 
 void Assembler::emit_byte(uint8_t byte, uint16_t& current_pc) {
+    if (!reset_vector_initialized) {
+        reset_vector = current_pc;
+        reset_vector_initialized = true;
+    }
+
     uint32_t expected_pc = reset_vector + machine_code.size();
 
     if (current_pc > expected_pc) {
