@@ -45,7 +45,8 @@ class Assembler {
         std::unordered_map<std::string_view, uint16_t> symbol_table; /**< Pairs string values to 16-bit addresses. */
         bool assembled;                                              /**< Flag to prevent duplicate work from multiple assemble() calls. */
         bool is_pass_1;                                              /**< Flag to prevent duplicate errors on multiple passes. */
-        const uint16_t reset_vector;                                 /**< The expected starting address of the program. */
+        uint16_t reset_vector;                                 /**< The expected starting address of the program. */
+        bool reset_vector_initialized;
         ///@}
 
         /**
